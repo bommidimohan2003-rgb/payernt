@@ -20,6 +20,12 @@ async function fetchAuthProfile(token: string, cachedUser: User | null): Promise
     try {
       const profile = await api.getMe(token);
       if (!profile) return cachedUser;
+      const isVerified = Boolean(
+        profile.isVerified ||
+        (profile as any)?.verified ||
+        ["approved", "active"].includes(String(profile.status || "").toLowerCase()) ||
+        ["approved", "verified"].includes(String((profile as any)?.kycStatus || (profile as any)?.kyc_status || "").toLowerCase())
+      );
       const loggedUser: User = {
         id: profile.email || profile.id || cachedUser?.id || token,
         fullName:
@@ -43,6 +49,9 @@ async function fetchAuthProfile(token: string, cachedUser: User | null): Promise
         profile_photo_url: profile.profilePhotoUrl || profile.profile_photo_url || cachedUser?.profilePhotoUrl || "",
         role: profile.role || cachedUser?.role || "customer",
         status: profile.status || cachedUser?.status || "active",
+        isVerified,
+        verified: isVerified,
+        kycStatus: (profile as any)?.kycStatus || (profile as any)?.kyc_status || (isVerified ? "APPROVED" : "PENDING"),
         panNumber: profile.panNumber || (profile as any)?.pan_number || cachedUser?.panNumber || "",
         panMasked: profile.panMasked || (profile as any)?.pan_masked || cachedUser?.panMasked || "",
         aadhaarMasked: profile.aadhaarMasked || profile.aadhaar_masked || cachedUser?.aadhaarMasked || "",
@@ -126,7 +135,9 @@ export function useAuth() {
         key !== STORAGE_KEYS.token &&
         key !== STORAGE_KEYS.refreshToken &&
         key !== STORAGE_KEYS.currentUser &&
-        key !== "payent:signed_out"
+        key !== "payent:signed_out" &&
+        key !== "payent_approved_event" &&
+        key !== "payent:admin:user_approved"
       ) {
         return;
       }
@@ -147,7 +158,9 @@ export function useAuth() {
             prev.id === nextUser.id &&
             prev.email === nextUser.email &&
             prev.fullName === nextUser.fullName &&
-            prev.avatar === nextUser.avatar
+            prev.avatar === nextUser.avatar &&
+            prev.isVerified === nextUser.isVerified &&
+            prev.status === nextUser.status
           ) {
             return prev; // Preserve reference identity to avoid unnecessary re-renders
           }
@@ -189,6 +202,12 @@ export function useAuth() {
 
     let loggedUser: User;
     if (res.user) {
+      const isUserVerified = Boolean(
+        res.user.isVerified ||
+        (res.user as any)?.verified ||
+        ["approved", "active"].includes(String(res.user.status || "").toLowerCase()) ||
+        ["approved", "verified"].includes(String((res.user as any)?.kycStatus || (res.user as any)?.kyc_status || "").toLowerCase())
+      );
       loggedUser = {
         id: res.user.email || res.user.id || email,
         accountId: res.user.accountId || `PAYRENT_USER_${Date.now()}`,
@@ -210,6 +229,9 @@ export function useAuth() {
         profile_photo_url: res.user.profilePhotoUrl || res.user.profile_photo_url || "",
         role: res.user.role || res.role || "customer",
         status: res.user.status || "active",
+        isVerified: isUserVerified,
+        verified: isUserVerified,
+        kycStatus: (res.user as any)?.kycStatus || (res.user as any)?.kyc_status || (isUserVerified ? "APPROVED" : "PENDING"),
         aadhaarMasked: res.user.aadhaarMasked || res.user.aadhaar_masked || "",
         website: res.user.website || "",
         upiId: res.user.upiId || "",
@@ -217,6 +239,12 @@ export function useAuth() {
     } else {
       try {
         const profile = await api.getMe(res.token);
+        const isProfileVerified = Boolean(
+          profile?.isVerified ||
+          (profile as any)?.verified ||
+          ["approved", "active"].includes(String(profile?.status || "").toLowerCase()) ||
+          ["approved", "verified"].includes(String((profile as any)?.kycStatus || (profile as any)?.kyc_status || "").toLowerCase())
+        );
         loggedUser = {
           id: profile?.email || email,
           accountId: (profile as any)?.accountId || `PAYRENT_USER_${Date.now()}`,
@@ -238,6 +266,9 @@ export function useAuth() {
           profile_photo_url: profile?.profilePhotoUrl || profile?.profile_photo_url || "",
           role: profile?.role || res.role || "customer",
           status: profile?.status || "active",
+          isVerified: isProfileVerified,
+          verified: isProfileVerified,
+          kycStatus: (profile as any)?.kycStatus || (profile as any)?.kyc_status || (isProfileVerified ? "APPROVED" : "PENDING"),
           aadhaarMasked: profile?.aadhaarMasked || profile?.aadhaar_masked || "",
           website: profile?.website || "",
           upiId: profile?.upiId || "",
@@ -251,6 +282,8 @@ export function useAuth() {
           email: email,
           role: res.role || "customer",
           status: "active",
+          isVerified: true,
+          verified: true,
         };
       }
     }

@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   XCircle,
   RefreshCw,
+  ClipboardPaste,
 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { useForm } from "react-hook-form";
@@ -53,6 +54,22 @@ export function LoginForm() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setError,
+    setValue,
+    getValues,
+    formState: { errors, isSubmitting },
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    mode: "onBlur",
+    defaultValues: { remember: true },
+  });
+
+  const watchRemember = watch("remember");
+
   // Mode: "password" or "otp"
   const [authMode, setAuthMode] = useState<"password" | "otp">("password");
 
@@ -78,6 +95,38 @@ export function LoginForm() {
     }, 1000);
     return () => clearInterval(interval);
   }, [resendCooldown]);
+
+  // Read OTP and Email parameters from URL (e.g. from transactional email verification links)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const urlOtp = (params.get("otp") || params.get("code") || "").trim();
+      const urlEmail = (params.get("email") || "").trim();
+
+      if (urlEmail) {
+        setOtpEmail(urlEmail);
+        setValue("email", urlEmail);
+      }
+
+      if (urlOtp && /^\d{6}$/.test(urlOtp)) {
+        setAuthMode("otp");
+        setOtpStep("verify");
+        if (urlEmail) setOtpEmail(urlEmail);
+        setOtpDigits(urlOtp.split(""));
+        setOtpError(null);
+
+        // Auto-copy to system clipboard for maximum convenience
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(urlOtp).catch(() => {});
+        }
+
+        toast.success(`Code ${urlOtp} auto-filled and copied to clipboard!`);
+      }
+    } catch {
+      // Safe catch for environment boundary
+    }
+  }, [setValue]);
 
   useEffect(() => {
     // Prevent multiple executions / navigation bounce loops
@@ -122,22 +171,6 @@ export function LoginForm() {
       navigate({ to: "/dashboard", replace: true });
     }
   }, [ready, user, navigate]);
-
-  const {
-    register,
-    handleSubmit,
-    watch,
-    setError,
-    setValue,
-    getValues,
-    formState: { errors, isSubmitting },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    mode: "onBlur",
-    defaultValues: { remember: true },
-  });
-
-  const watchRemember = watch("remember");
 
   const handleLoginSuccess = (res: any, email: string) => {
     toast.success("Signed in successfully!");
@@ -366,7 +399,7 @@ export function LoginForm() {
       const res = await api.loginOtpRequest(cleanEmail);
       if (res?.success) {
         setResendCooldown(60);
-        toast.success("A fresh login code has been sent to your email!");
+        toast.success(`Login code sent to ${cleanEmail}`);
       } else {
         const msg = res?.error || res?.message || "Failed to resend code.";
         setOtpError(msg);
@@ -425,6 +458,33 @@ export function LoginForm() {
 
     if (pasted.length === 6) {
       handleVerifyOtp(pasted);
+    }
+  };
+
+  const handlePasteFromClipboard = async () => {
+    try {
+      if (!navigator.clipboard || !navigator.clipboard.readText) {
+        toast.info("Please press Ctrl+V / Cmd+V in the box to paste.");
+        return;
+      }
+      const text = await navigator.clipboard.readText();
+      const clean = text.replace(/\D/g, "").slice(0, 6);
+      if (!clean) {
+        toast.error("No numeric verification code found in clipboard.");
+        return;
+      }
+      const updated = ["", "", "", "", "", ""];
+      for (let i = 0; i < clean.length; i++) updated[i] = clean[i];
+      setOtpDigits(updated);
+      setOtpError(null);
+      toast.success(`Pasted code ${clean}`);
+      const targetIndex = Math.min(clean.length, 5);
+      otpInputRefs.current[targetIndex]?.focus();
+      if (clean.length === 6) {
+        handleVerifyOtp(clean);
+      }
+    } catch {
+      toast.info("Please press Ctrl+V / Cmd+V in the box to paste.");
     }
   };
 
@@ -532,7 +592,7 @@ export function LoginForm() {
             </div>
           </div>
 
-          {/* Alternative: Email OTP Login Button */}
+          {/* Email OTP Alternative Option */}
           <button
             type="button"
             onClick={() => {
@@ -545,7 +605,7 @@ export function LoginForm() {
             }}
             className="w-full font-bold h-10.5 sm:h-11 rounded-xl border border-border/80 dark:border-neutral-700/80 bg-secondary/50 hover:bg-secondary dark:bg-[#252525] dark:hover:bg-[#2A2A2A] text-foreground transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 text-xs sm:text-sm"
           >
-            <Mail className="h-4 w-4 text-primary shrink-0" />
+            <Mail className="h-4 w-4 text-primary shrink-0 stroke-[1.8]" />
             <span>Sign in with Email OTP</span>
           </button>
         </form>
@@ -553,11 +613,9 @@ export function LoginForm() {
         /* Email OTP Section */
         otpStep === "request" ? (
           <form onSubmit={handleRequestOtp} className="space-y-4">
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Enter your registered email address to receive a secure 6-digit login verification code.
-              </p>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              Enter your registered email address to receive a 6-digit login code.
+            </p>
 
             <Input
               label="Email address"
@@ -588,12 +646,12 @@ export function LoginForm() {
               {isSendingOtp ? (
                 <div className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Sending Login Code...</span>
+                  <span>Sending code...</span>
                 </div>
               ) : (
                 <>
                   <ArrowRight className="h-4 w-4 shrink-0" />
-                  <span>Send Login Code</span>
+                  <span>Send login code</span>
                 </>
               )}
             </Button>
@@ -610,7 +668,7 @@ export function LoginForm() {
               </div>
             </div>
 
-            {/* Alternative: Password Login Button */}
+            {/* Password Login Alternative Option */}
             <button
               type="button"
               onClick={() => {
@@ -621,38 +679,50 @@ export function LoginForm() {
               }}
               className="w-full font-bold h-10.5 sm:h-11 rounded-xl border border-border/80 dark:border-neutral-700/80 bg-secondary/50 hover:bg-secondary dark:bg-[#252525] dark:hover:bg-[#2A2A2A] text-foreground transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 text-xs sm:text-sm"
             >
-              <Lock className="h-4 w-4 text-primary shrink-0" />
-              <span>Sign in with Password</span>
+              <Lock className="h-4 w-4 text-primary shrink-0 stroke-[1.8]" />
+              <span>Sign in with password</span>
             </button>
           </form>
         ) : (
           /* OTP Verification Step */
-          <div className="space-y-5">
-            <div className="text-center space-y-1">
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Enter the 6-digit login code sent to{" "}
-                <span className="font-bold text-foreground">{otpEmail}</span>
-              </p>
-              <div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOtpStep("request");
-                    setOtpError(null);
-                  }}
-                  className="text-[11px] font-semibold text-primary hover:underline cursor-pointer inline-flex items-center gap-1"
-                >
-                  <ArrowLeft className="h-3 w-3" />
-                  <span>Change email address</span>
-                </button>
+          <div className="space-y-4">
+            {/* Target Email Check & Change */}
+            <div className="p-3 rounded-xl bg-secondary/40 border border-border/70 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Mail className="h-4 w-4 text-primary shrink-0" />
+                <div className="min-w-0 text-left">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Code sent to</p>
+                  <p className="text-xs font-bold text-foreground truncate">{otpEmail}</p>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setOtpStep("request");
+                  setOtpError(null);
+                }}
+                className="text-xs font-semibold text-primary hover:underline shrink-0 cursor-pointer"
+              >
+                Change
+              </button>
             </div>
 
             {/* 6 Digit Input Group */}
-            <div className="space-y-3">
-              <label className="block text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Enter 6-Digit Code
-              </label>
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between px-1">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Enter 6-digit code
+                </label>
+                <button
+                  type="button"
+                  onClick={handlePasteFromClipboard}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline cursor-pointer transition-colors"
+                  title="Paste 6-digit code from clipboard"
+                >
+                  <ClipboardPaste className="h-3.5 w-3.5" />
+                  <span>Paste code</span>
+                </button>
+              </div>
               <div className="flex items-center justify-center gap-2 sm:gap-2.5" onPaste={handlePaste}>
                 {otpDigits.map((digit, i) => (
                   <input
@@ -697,29 +767,19 @@ export function LoginForm() {
               {isVerifyingOtp ? (
                 <div className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Verifying Code...</span>
+                  <span>Verifying code...</span>
                 </div>
               ) : (
                 <>
                   <CheckCircle2 className="h-4 w-4 shrink-0" />
-                  <span>Verify & Sign In</span>
+                  <span>Verify & sign in</span>
                 </>
               )}
             </Button>
 
-            {/* Resend & Back */}
-            <div className="flex items-center justify-between pt-1 text-xs">
-              <button
-                type="button"
-                onClick={() => {
-                  setOtpStep("request");
-                  setOtpError(null);
-                }}
-                className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground font-semibold transition-colors cursor-pointer"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                <span>Back</span>
-              </button>
+            {/* Resend & Timer */}
+            <div className="flex items-center justify-between text-xs pt-0.5">
+              <span className="text-[11px] text-muted-foreground">Code valid for 5 minutes</span>
 
               <div>
                 {resendCooldown > 0 ? (
@@ -741,7 +801,7 @@ export function LoginForm() {
                     ) : (
                       <>
                         <RefreshCw className="h-3 w-3" />
-                        <span>Resend Code</span>
+                        <span>Resend code</span>
                       </>
                     )}
                   </button>
@@ -749,12 +809,8 @@ export function LoginForm() {
               </div>
             </div>
 
-            <div className="p-2.5 rounded-xl bg-secondary/50 border border-border/60 text-[11px] text-muted-foreground text-center">
-              <span>Code is valid for 5 minutes. Check spam or junk folder if not received.</span>
-            </div>
-
             {/* OR Divider */}
-            <div className="relative my-4">
+            <div className="relative my-3">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-border/70 dark:border-[#2D2D2D]" />
               </div>
@@ -765,7 +821,7 @@ export function LoginForm() {
               </div>
             </div>
 
-            {/* Alternative: Password Login Button */}
+            {/* Password Login Alternative Option */}
             <button
               type="button"
               onClick={() => {
@@ -776,8 +832,8 @@ export function LoginForm() {
               }}
               className="w-full font-bold h-10.5 sm:h-11 rounded-xl border border-border/80 dark:border-neutral-700/80 bg-secondary/50 hover:bg-secondary dark:bg-[#252525] dark:hover:bg-[#2A2A2A] text-foreground transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 text-xs sm:text-sm"
             >
-              <Lock className="h-4 w-4 text-primary shrink-0" />
-              <span>Sign in with Password</span>
+              <Lock className="h-4 w-4 text-primary shrink-0 stroke-[1.8]" />
+              <span>Sign in with password</span>
             </button>
           </div>
         )

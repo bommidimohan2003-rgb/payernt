@@ -1,4 +1,4 @@
-import { Sun, Moon } from "lucide-react";
+import { Sun, Moon, Menu } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 import { useRouterState } from "@tanstack/react-router";
 import { SearchBar } from "./SearchBar";
@@ -6,28 +6,39 @@ import { NotificationDropdown } from "./NotificationDropdown";
 import { ProfileDropdown } from "./ProfileDropdown";
 import { useState, useEffect } from "react";
 import { adminWS, ConnectionStatus } from "@/admin/services/websocket";
+import { cn } from "@/lib/utils";
 
 const ROUTE_META: Record<string, { title: string; subtitle: string }> = {
-  "/admin": { title: "Dashboard", subtitle: "Overview of your Payent platform" },
-  "/admin/dashboard": { title: "Dashboard", subtitle: "Overview of your Payent platform" },
-  "/admin/analytics": { title: "Analytics", subtitle: "Platform growth, revenue and operational insights" },
-  "/admin/users": { title: "Users", subtitle: "Manage all Payent and Payrent users" },
-  "/admin/agents": { title: "Agents", subtitle: "Manage verified agents and vendor accounts" },
-  "/admin/products": { title: "Products", subtitle: "Manage all listed equipment and rental products" },
-  "/admin/categories": { title: "Categories", subtitle: "Manage product categories" },
-  "/admin/bookings": { title: "Bookings", subtitle: "Track and manage all rental bookings" },
-  "/admin/payments": { title: "Payments", subtitle: "Track all transactions and payouts" },
-  "/admin/reviews": { title: "Reviews", subtitle: "Manage user reviews and ratings" },
-  "/admin/reports": { title: "Reports", subtitle: "Generate and view platform reports" },
-  "/admin/notifications": { title: "Notifications", subtitle: "Send and manage platform notifications" },
-  "/admin/support": { title: "Support", subtitle: "Manage user support tickets" },
-  "/admin/activity-logs": { title: "Activity Logs", subtitle: "Track all administrative activities" },
-  "/admin/pin-verification": { title: "8-Digit PIN Verification", subtitle: "Verify product security PIN (Vendor 4-digit + Renter 4-digit)" },
-  "/admin/profile": { title: "Profile", subtitle: "Administrator profile details and credentials" },
-  "/admin/settings": { title: "Settings", subtitle: "Platform configuration and preferences" },
+  "/admin": { title: "Dashboard", subtitle: "Marketplace operations and review queue" },
+  "/admin/dashboard": { title: "Dashboard", subtitle: "Marketplace operations and review queue" },
+  "/admin/analytics": { title: "Analytics", subtitle: "Booking trends, utilization, and revenue" },
+  "/admin/users": { title: "Users", subtitle: "Account directory and KYC status" },
+  "/admin/kyc": { title: "KYC verification", subtitle: "Identity document inspection for vendors and renters" },
+  "/admin/agents": { title: "Agents", subtitle: "Verified equipment lenders and fleet performance" },
+  "/admin/products": { title: "Products", subtitle: "Equipment listings and price configuration" },
+  "/admin/categories": { title: "Categories", subtitle: "Catalog equipment categories" },
+  "/admin/knowledge": { title: "Knowledge base", subtitle: "Support retrieval articles and drafts" },
+  "/admin/bookings": { title: "Bookings", subtitle: "Rental orders, handovers, and cancellations" },
+  "/admin/payments": { title: "Payments", subtitle: "Transactions, escrow settlements, and refunds" },
+  "/admin/wallet": { title: "Payments", subtitle: "Transactions, escrow settlements, and refunds" },
+  "/admin/reviews": { title: "Reviews", subtitle: "Customer feedback and moderation" },
+  "/admin/reports": { title: "Reports", subtitle: "Platform exports and dispute resolution" },
+  "/admin/notifications": { title: "Notifications", subtitle: "System and operational alerts" },
+  "/admin/support": { title: "Support", subtitle: "Customer tickets and escalations" },
+  "/admin/help": { title: "Support", subtitle: "Customer tickets and escalations" },
+  "/admin/messages": { title: "Support", subtitle: "Customer tickets and escalations" },
+  "/admin/activity-logs": { title: "Activity logs", subtitle: "Administrative audit trail" },
+  "/admin/activity": { title: "Activity logs", subtitle: "Administrative audit trail" },
+  "/admin/pin-verification": { title: "PIN verification", subtitle: "Verify vendor and renter 8-digit handover code" },
+  "/admin/profile": { title: "Profile", subtitle: "Administrator account credentials" },
+  "/admin/settings": { title: "Settings", subtitle: "Marketplace configuration and theme" },
 };
 
-export function Topbar() {
+interface TopbarProps {
+  onOpenMobileMenu?: () => void;
+}
+
+export function Topbar({ onOpenMobileMenu }: TopbarProps) {
   const { theme, toggle } = useTheme();
   const [wsStatus, setWsStatus] = useState<ConnectionStatus>("DISCONNECTED");
   const routerState = useRouterState();
@@ -37,13 +48,18 @@ export function Topbar() {
   if (!currentMeta) {
     if (currentPath.startsWith("/admin/products/") && currentPath.length > "/admin/products/".length) {
       currentMeta = {
-        title: "Product Inspection",
-        subtitle: "Listing verification, specifications & price configuration",
+        title: "Product inspection",
+        subtitle: "Listing verification, specifications, and pricing",
+      };
+    } else if (currentPath.startsWith("/admin/kyc/") && currentPath.length > "/admin/kyc/".length) {
+      currentMeta = {
+        title: "KYC application",
+        subtitle: "Government document check and decision",
       };
     } else {
       currentMeta = {
-        title: "Admin Portal",
-        subtitle: "Payent Marketplace Operations",
+        title: "Admin portal",
+        subtitle: "Payent marketplace operations",
       };
     }
   }
@@ -57,67 +73,72 @@ export function Topbar() {
     };
   }, []);
 
+  const statusMeta =
+    wsStatus === "LIVE" || wsStatus === "ONLINE"
+      ? { label: "Live", dotClass: "bg-[var(--admin-success)]" }
+      : wsStatus === "POLLING"
+      ? { label: "Synced", dotClass: "bg-[var(--admin-success)]" }
+      : wsStatus === "CONNECTING"
+      ? { label: "Connecting", dotClass: "bg-[var(--admin-warning)]" }
+      : { label: "Polling", dotClass: "bg-[var(--admin-text-muted)]" };
+
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between px-6 md:px-8 h-16 bg-white/95 dark:bg-[#1E1E1E]/95 border-b border-[#E6E4E9] dark:border-[#383838] backdrop-blur-md transition-colors duration-200">
-      {/* Left side: Current page title & contextual subtitle */}
-      <div className="flex flex-col justify-center min-w-0 pr-4 pl-11 lg:pl-0">
-        <h1 className="text-base font-bold tracking-tight text-[#242424] dark:text-[#FFFFFF] truncate">
-          {currentMeta.title}
-        </h1>
-        <p className="text-[11px] text-[#77757D] dark:text-[#B3B3B3] truncate hidden sm:block">
-          {currentMeta.subtitle}
-        </p>
+    <header className="sticky top-0 z-30 flex items-center justify-between gap-2 sm:gap-4 px-4 sm:px-6 lg:px-8 h-16 bg-[var(--admin-sidebar)] border-b border-[var(--admin-border)] transition-colors duration-150">
+      {/* Left: Mobile Drawer Trigger + Current Page Heading */}
+      <div className="flex items-center gap-3 min-w-0 lg:w-56 xl:w-64 shrink-0">
+        {onOpenMobileMenu && (
+          <button
+            type="button"
+            onClick={onOpenMobileMenu}
+            className="lg:hidden h-9 w-9 flex items-center justify-center rounded-lg bg-[var(--admin-card)] border border-[var(--admin-border)] text-[var(--admin-text)] hover:bg-[var(--admin-elevated)] transition-colors cursor-pointer shrink-0"
+            aria-label="Open navigation menu"
+          >
+            <Menu className="h-4 w-4" strokeWidth={1.5} />
+          </button>
+        )}
+        <div className="flex flex-col justify-center min-w-0">
+          <h1 className="text-sm sm:text-base font-semibold text-[var(--admin-text)] truncate">
+            {currentMeta.title}
+          </h1>
+          <p className="text-xs text-[var(--admin-text-muted)] truncate hidden xl:block">
+            {currentMeta.subtitle}
+          </p>
+        </div>
       </div>
 
-      {/* Right side: Operational Controls, Search & Profile */}
-      <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
-        {/* Live Stream Telemetry Indicator (Desktop) */}
-        <div className="hidden lg:flex items-center">
-          {wsStatus === "LIVE" || wsStatus === "ONLINE" || wsStatus === "POLLING" ? (
-            <span className="px-2.5 py-1 text-[11px] font-medium rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 flex items-center gap-1.5 shadow-2xs">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#10B981] opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#10B981]"></span>
-              </span>
-              Live Telemetry
-            </span>
-          ) : wsStatus === "CONNECTING" ? (
-            <span className="px-2.5 py-1 text-[11px] font-medium rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 flex items-center gap-1.5 shadow-2xs">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#10B981] animate-pulse"></span>
-              Live Telemetry
-            </span>
-          ) : (
-            <span className="px-2.5 py-1 text-[11px] font-medium rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 flex items-center gap-1.5 shadow-2xs">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#10B981]"></span>
-              Live Telemetry
-            </span>
-          )}
+      {/* Center: Symbol-Free Search Bar with Typewriter Animation */}
+      <div className="flex-1 min-w-0 flex justify-end sm:justify-center">
+        <SearchBar className="max-w-44 sm:max-w-xs lg:max-w-sm xl:max-w-md" />
+      </div>
+
+      {/* Right: Operational Telemetry, Theme, Notifications & Profile */}
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <div
+          className="hidden xl:inline-flex items-center gap-2 px-3 h-9 rounded-lg bg-[var(--admin-card)] border border-[var(--admin-border)] text-xs text-[var(--admin-text-secondary)] font-mono tabular-nums"
+          title={`WebSocket telemetry: ${wsStatus}`}
+        >
+          <span className={cn("h-2 w-2 rounded-full shrink-0", statusMeta.dotClass)} />
+          <span>{statusMeta.label}</span>
         </div>
 
-        {/* Global Search */}
-        <SearchBar />
-
-        {/* Theme Toggle */}
         <button
+          type="button"
           onClick={toggle}
-          className="p-2 rounded-lg text-[#77757D] dark:text-[#B3B3B3] hover:text-[#242424] dark:hover:text-[#FFFFFF] hover:bg-[#F8F7F9] dark:hover:bg-[#262626] border border-transparent hover:border-[#E6E4E9] dark:hover:border-[#383838] transition-all cursor-pointer"
+          className="h-9 w-9 flex items-center justify-center rounded-lg text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-elevated)] border border-transparent hover:border-[var(--admin-border)] transition-colors cursor-pointer"
           title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
           aria-label="Toggle theme"
         >
           {theme === "dark" ? (
-            <Sun className="h-4 w-4" />
+            <Sun className="h-4 w-4" strokeWidth={1.5} />
           ) : (
-            <Moon className="h-4 w-4" />
+            <Moon className="h-4 w-4" strokeWidth={1.5} />
           )}
         </button>
 
-        {/* Notification Dropdown */}
         <NotificationDropdown />
 
-        {/* Subtle Divider */}
-        <div className="h-5 w-[1px] bg-[#E6E4E9] dark:bg-[#383838] shrink-0" />
+        <div className="hidden sm:block h-4 w-px bg-[var(--admin-border)] shrink-0" />
 
-        {/* Admin Profile */}
         <ProfileDropdown />
       </div>
     </header>

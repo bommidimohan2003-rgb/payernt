@@ -274,20 +274,20 @@
   --payent-text-secondary: #525252;
   --payent-text-muted: #525252;
 
-  /* Admin Design System Tokens - Light Theme */
+  /* Admin Design System Tokens - Light Theme (Graphite Neutral Ramp + Emerald World Accent) */
   --admin-bg: #FAFAFA;
   --admin-sidebar: #FFFFFF;
-  --admin-elevated: #F5F5F5;
+  --admin-elevated: #F4F4F5;
   --admin-card: #FFFFFF;
-  --admin-secondary-surface: #F5F5F5;
-  --admin-text: #0A0A0A;
+  --admin-secondary-surface: #F4F4F5;
+  --admin-text: #171717;
   --admin-text-secondary: #525252;
-  --admin-text-muted: #525252;
-  --admin-border: #E5E5E5;
-  --admin-accent: #0A0A0A;
+  --admin-text-muted: #737373;
+  --admin-border: rgba(23, 23, 23, 0.09);
+  --admin-accent: #171717;
   --admin-accent-hover: #262626;
-  --admin-orange-start: #262626;
-  --admin-orange-end: #0A0A0A;
+  --admin-orange-start: #171717;
+  --admin-orange-end: #171717;
   --admin-success: #047857;
   --admin-warning: #8A5A00;
   --admin-error: #C93636;
@@ -386,23 +386,23 @@
   --payent-text-secondary: #B3B3B3;
   --payent-text-muted: #8A8A8A;
 
-  /* Admin Design System Tokens - Dark Theme */
-  --admin-bg: #1E1E1E;
-  --admin-sidebar: #1E1E1E;
-  --admin-elevated: #282828;
-  --admin-card: #1E1E1E;
-  --admin-secondary-surface: #262626;
-  --admin-text: #FFFFFF;
-  --admin-text-secondary: #B3B3B3;
-  --admin-text-muted: #8A8A8A;
-  --admin-border: #383838;
-  --admin-accent: #FFFFFF;
-  --admin-accent-hover: #E5E5E5;
-  --admin-orange-start: #FFFFFF;
-  --admin-orange-end: #E5E5E5;
-  --admin-success: #34D399;
+  /* Admin Design System Tokens - Dark Theme (Graphite Surface Step Ramp) */
+  --admin-bg: #141415;
+  --admin-sidebar: #0F0F10;
+  --admin-elevated: #232325;
+  --admin-card: #19191B;
+  --admin-secondary-surface: #232325;
+  --admin-text: #EDEDED;
+  --admin-text-secondary: #A1A1A6;
+  --admin-text-muted: #85858B;
+  --admin-border: rgba(237, 237, 237, 0.08);
+  --admin-accent: #EDEDED;
+  --admin-accent-hover: #FFFFFF;
+  --admin-orange-start: #EDEDED;
+  --admin-orange-end: #EDEDED;
+  --admin-success: #4CC38A;
   --admin-warning: #F5B942;
-  --admin-error: #F05252;
+  --admin-error: #E5484D;
 
   /* Dark Mode Spatial Elevation Tokens (0dp, 4dp, 8dp, 16dp) */
   --elevation-0-shadow: none;

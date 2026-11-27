@@ -118,10 +118,10 @@ export default function Notifications() {
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-border/50">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#F5F5F5]">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--admin-text)]">
             Notifications
           </h1>
-          <p className="text-xs text-[#A1A1AA] mt-0.5 font-medium">
+          <p className="text-xs text-[var(--admin-text-muted)] mt-0.5 font-medium">
             Send and manage platform notifications.
           </p>
         </div>
@@ -130,9 +130,9 @@ export default function Notifications() {
           {tabCounts.unread > 0 && (
             <button
               onClick={handleMarkAllRead}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[rgba(161,161,170,0.18)] bg-[#10151B] hover:bg-[#171C23] text-[#F5F5F5] text-xs font-medium transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs font-medium transition-colors cursor-pointer"
             >
-              <CheckCheck className="h-3.5 w-3.5 text-[#A1A1AA]" />
+              <CheckCheck className="h-3.5 w-3.5 text-[var(--admin-text-muted)]" />
               <span>Mark all read</span>
             </button>
           )}
@@ -140,10 +140,10 @@ export default function Notifications() {
           <button
             onClick={() => fetchNotifications()}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[rgba(161,161,170,0.18)] bg-[#10151B] hover:bg-[#171C23] text-[#F5F5F5] text-xs font-medium transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs font-medium transition-colors cursor-pointer"
             title="Refresh notifications"
           >
-            <RefreshCw className={cn("h-3.5 w-3.5 text-[#A1A1AA]", loading && "animate-spin")} />
+            <RefreshCw className={cn("h-3.5 w-3.5 text-[var(--admin-text-muted)]", loading && "animate-spin")} />
             <span>Refresh</span>
           </button>
 
@@ -151,7 +151,7 @@ export default function Notifications() {
             onClick={() => {
               toast.info("Notification composer ready.");
             }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-neutral-200 text-black font-semibold text-xs transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--admin-accent)] hover:bg-[var(--admin-accent-hover)] text-[var(--admin-bg)] font-semibold text-xs transition-colors cursor-pointer"
           >
             <Bell className="h-3.5 w-3.5" />
             <span>Send Notification</span>
@@ -160,7 +160,7 @@ export default function Notifications() {
       </div>
 
       {/* TABS (Panel 11): All | Unread | System | Bookings | Users */}
-      <div className="flex items-center gap-2 border-b border-[rgba(161,161,170,0.18)] pb-2 overflow-x-auto no-scrollbar">
+      <div className="flex items-center gap-2 border-b border-[var(--admin-border)] pb-2 overflow-x-auto no-scrollbar">
         {[
           { id: "all", label: "All", count: tabCounts.all },
           { id: "unread", label: "Unread", count: tabCounts.unread },
@@ -172,17 +172,17 @@ export default function Notifications() {
             key={tab.id}
             onClick={() => setCategoryFilter(tab.id)}
             className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer flex items-center gap-2",
+              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap cursor-pointer flex items-center gap-2",
               categoryFilter === tab.id
-                ? "bg-white text-black font-semibold shadow-xs"
-                : "text-[#A1A1AA] hover:text-[#F5F5F5] hover:bg-white/5 border border-transparent"
+                ? "bg-[var(--admin-accent)] text-[var(--admin-bg)] font-semibold shadow-xs"
+                : "text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-elevated)] border border-transparent"
             )}
           >
             <span>{tab.label}</span>
             <span
               className={cn(
-                "px-1.5 py-0.5 rounded-full text-[10px] font-mono",
-                categoryFilter === tab.id ? "bg-black/15 text-black font-bold" : "bg-white/10 text-[#A1A1AA]"
+                "px-1.5 py-0.5 rounded-full text-[11px] font-mono",
+                categoryFilter === tab.id ? "bg-white/20 dark:bg-black/15 text-[var(--admin-bg)] font-medium" : "bg-[var(--admin-elevated)] text-[var(--admin-text-muted)]"
               )}
             >
               {tab.count}
@@ -193,31 +193,31 @@ export default function Notifications() {
 
       {/* ERROR STATE */}
       {error && !loading ? (
-        <div className="bg-[#10151B] rounded-xl border border-red-500/20 p-8 text-center flex flex-col items-center justify-center space-y-3">
+        <div className="bg-[var(--admin-card)] rounded-xl border border-red-500/20 p-8 text-center flex flex-col items-center justify-center space-y-3">
           <div className="w-10 h-10 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center">
             <ShieldAlert className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-[#F5F5F5]">Database Sync Failed</h3>
-            <p className="text-xs text-[#A1A1AA] mt-1 max-w-sm">{error}</p>
+            <h3 className="text-sm font-semibold text-[var(--admin-text)]">Database Sync Failed</h3>
+            <p className="text-xs text-[var(--admin-text-muted)] mt-1 max-w-sm">{error}</p>
           </div>
           <button
             onClick={() => fetchNotifications()}
-            className="px-4 py-2 rounded-lg bg-[#171C23] hover:bg-[#171C23]/80 text-[#F5F5F5] text-xs font-medium transition-colors border border-[rgba(161,161,170,0.18)] cursor-pointer"
+            className="px-4 py-2 rounded-lg bg-[var(--admin-elevated)] hover:bg-[var(--admin-elevated)]/80 text-[var(--admin-text)] text-xs font-medium transition-colors border border-[var(--admin-border)] cursor-pointer"
           >
             Retry Database Fetch
           </button>
         </div>
       ) : (
         /* NOTIFICATIONS TABLE (Panel 11) */
-        <div className="bg-[#10151B] rounded-xl border border-[rgba(161,161,170,0.18)] overflow-hidden">
+        <div className="bg-[var(--admin-card)] rounded-xl border border-[var(--admin-border)] overflow-hidden">
           {filteredNotifications.length === 0 ? (
-            <div className="py-16 text-center text-xs text-[#A1A1AA] space-y-2">
-              <Bell className="h-5 w-5 text-[#A1A1AA] mx-auto opacity-40" />
+            <div className="py-16 text-center text-xs text-[var(--admin-text-muted)] space-y-2">
+              <Bell className="h-5 w-5 text-[var(--admin-text-muted)] mx-auto opacity-40" />
               <p>No notifications found in this view.</p>
             </div>
           ) : (
-            <div className="divide-y divide-[rgba(161,161,170,0.1)]">
+            <div className="divide-y divide-[var(--admin-border)]">
               {filteredNotifications.map((notif) => {
                 const match = notif.title.match(/TICK-\d+/) || notif.message.match(/TICK-\d+/);
                 const ticketId = (notif as any).ticket_id || (notif as any).ticketId || (match ? match[0] : null);
@@ -232,42 +232,42 @@ export default function Notifications() {
                     className={cn(
                       "p-4 flex items-center justify-between gap-4 transition-colors",
                       ticketId ? "cursor-pointer" : "cursor-default",
-                      !notif.read ? "bg-white/[0.02]" : "hover:bg-white/[0.01]"
+                      !notif.read ? "bg-[var(--admin-elevated)]/60" : "hover:bg-[var(--admin-elevated)]/40"
                     )}
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div
                         className={cn(
                           "h-2 w-2 rounded-full shrink-0",
-                          !notif.read ? "bg-red-500" : "bg-neutral-600"
+                          !notif.read ? "bg-red-500" : "bg-[var(--admin-text-muted)]"
                         )}
                       />
                       <div className="min-w-0">
-                        <div className="text-xs font-bold text-[#F5F5F5] truncate flex items-center gap-2">
+                        <div className="text-xs font-bold text-[var(--admin-text)] truncate flex items-center gap-2">
                           <span>{notif.title}</span>
                           {ticketId && (
-                            <span className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                               View Ticket →
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-[#A1A1AA] line-clamp-1 mt-0.5">
+                        <div className="text-[11px] text-[var(--admin-text-muted)] line-clamp-1 mt-0.5">
                           {notif.message}
                         </div>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-3 shrink-0">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-[#171C23] text-[#A1A1AA] border border-[rgba(161,161,170,0.18)]">
+                      <span className="px-2 py-0.5 rounded text-[11px] font-mono bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] border border-[var(--admin-border)]">
                         {notif.type || "System"}
                       </span>
-                      <span className="text-[11px] font-mono text-[#A1A1AA]">
+                      <span className="text-[11px] font-mono text-[var(--admin-text-muted)]">
                         {notif.createdAt ? new Date(notif.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Recent"}
                       </span>
                       <span
                         className={cn(
-                          "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
-                          !notif.read ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-neutral-800 text-neutral-400"
+                          "px-2 py-0.5 rounded text-[11px] font-medium",
+                          !notif.read ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-[var(--admin-elevated)] text-[var(--admin-text-muted)]"
                         )}
                       >
                         {!notif.read ? "Unread" : "Read"}
@@ -277,7 +277,7 @@ export default function Notifications() {
                           e.stopPropagation();
                           handleDelete(notif.id);
                         }}
-                        className="p-1 rounded text-[#A1A1AA] hover:text-red-400 transition-colors cursor-pointer"
+                        className="p-1 rounded text-[var(--admin-text-muted)] hover:text-red-400 transition-colors cursor-pointer"
                         title="Dismiss"
                       >
                         <Trash2 className="h-3.5 w-3.5" />

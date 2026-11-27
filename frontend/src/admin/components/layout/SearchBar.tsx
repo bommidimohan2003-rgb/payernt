@@ -1,15 +1,77 @@
 import { useState, useEffect } from "react";
-import { Search, Command } from "lucide-react";
+import { Search } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
 import { CommandSearchModal } from "./CommandSearchModal";
 
-export function SearchBar() {
-  const [modalOpen, setModalOpen] = useState(false);
+export const ADMIN_SEARCH_PHRASES = [
+  "Search users and KYC",
+  "Search rentals and bookings",
+  "Search products and categories",
+  "Search payments and payouts",
+  "Search support tickets and logs",
+] as const;
 
-  // Global Ctrl + K or "/" listener (when not already typing in an input)
+export function useTypewriterText(phrases: readonly string[], paused = false): {
+  text: string;
+  reducedMotion: boolean;
+} {
+  const shouldReduceMotion = useReducedMotion() ?? false;
+  const [phraseIndex, setPhraseIndex] = useState(0);
+  const [displayText, setDisplayText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    if (shouldReduceMotion) {
+      setDisplayText(phrases[0] || "Search workspace");
+      return;
+    }
+
+    if (paused) return;
+
+    const currentPhrase = phrases[phraseIndex % phrases.length] || "Search workspace";
+    let timer: ReturnType<typeof setTimeout>;
+
+    if (!isDeleting) {
+      if (displayText.length < currentPhrase.length) {
+        timer = setTimeout(() => {
+          setDisplayText(currentPhrase.slice(0, displayText.length + 1));
+        }, 55);
+      } else {
+        timer = setTimeout(() => {
+          setIsDeleting(true);
+        }, 1700);
+      }
+    } else if (displayText.length > 0) {
+      timer = setTimeout(() => {
+        setDisplayText(displayText.slice(0, -1));
+      }, 28);
+    } else {
+      timer = setTimeout(() => {
+        setIsDeleting(false);
+        setPhraseIndex((prev) => (prev + 1) % phrases.length);
+      }, 320);
+    }
+
+    return () => clearTimeout(timer);
+  }, [displayText, isDeleting, paused, phraseIndex, phrases, shouldReduceMotion]);
+
+  return { text: displayText, reducedMotion: shouldReduceMotion };
+}
+
+export function SearchBar({ className = "" }: { className?: string }) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const { text: displayText, reducedMotion } = useTypewriterText(
+    ADMIN_SEARCH_PHRASES,
+    modalOpen
+  );
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const activeTag = document.activeElement?.tagName.toLowerCase();
-      const isInput = activeTag === "input" || activeTag === "textarea" || (document.activeElement as HTMLElement)?.isContentEditable;
+      const isInput =
+        activeTag === "input" ||
+        activeTag === "textarea" ||
+        (document.activeElement as HTMLElement)?.isContentEditable;
 
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
@@ -28,19 +90,30 @@ export function SearchBar() {
       <button
         type="button"
         onClick={() => setModalOpen(true)}
-        className="relative flex items-center w-48 sm:w-64 md:w-72 px-3 py-1.5 rounded-lg bg-secondary/40 hover:bg-secondary/80 border border-border/70 text-muted-foreground hover:text-foreground text-xs font-medium transition-all group cursor-pointer"
-        aria-label="Search PAYENT..."
+        className={`flex items-center w-full h-9 px-3 rounded-lg bg-[var(--admin-elevated)] hover:bg-[var(--admin-elevated)]/80 border border-[var(--admin-border)] hover:border-[var(--admin-text)]/25 text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] text-xs font-medium transition-colors cursor-pointer ${className}`}
+        aria-label="Search admin workspace"
       >
-        <Search className="h-3.5 w-3.5 mr-2 text-muted-foreground/80 group-hover:text-emerald-500 transition-colors shrink-0" />
-        <span className="truncate text-xs">Search PAYENT...</span>
-        <div className="ml-auto flex items-center gap-0.5 border border-border/60 rounded px-1 py-0.5 bg-background text-[10px] font-mono font-medium text-muted-foreground shrink-0">
-          <Command className="h-2.5 w-2.5" />
-          <span>K</span>
-        </div>
+        <Search
+          className="h-3.5 w-3.5 mr-2 text-[var(--admin-text-muted)] shrink-0"
+          strokeWidth={1.5}
+          aria-hidden="true"
+        />
+        <span className="flex items-center min-w-0 flex-1 text-left">
+          <span className="truncate">{displayText || "\u00A0"}</span>
+          <motion.span
+            aria-hidden="true"
+            animate={reducedMotion ? { opacity: 1 } : { opacity: [1, 1, 0, 0] }}
+            transition={
+              reducedMotion
+                ? undefined
+                : { duration: 0.9, repeat: Infinity, times: [0, 0.49, 0.5, 1] }
+            }
+            className="inline-block w-0.5 h-3.5 bg-[var(--admin-text)] ml-0.5 shrink-0"
+          />
+        </span>
       </button>
 
       <CommandSearchModal open={modalOpen} onClose={() => setModalOpen(false)} />
     </>
   );
 }
-

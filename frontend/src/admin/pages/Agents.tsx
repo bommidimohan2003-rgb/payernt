@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "@tanstack/react-router";
 import { ProfilePhoto } from "@/components/common/ProfilePhoto";
+import { ConfirmDialog } from "../components/layout/ConfirmDialog";
 
 export default function Agents() {
   const [agents, setAgents] = useState<AdminAgent[]>([]);
@@ -35,6 +36,8 @@ export default function Agents() {
   // Agent detail modal
   const [selectedAgent, setSelectedAgent] = useState<AdminAgent | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [suspendAgentId, setSuspendAgentId] = useState<string | null>(null);
+  const [suspending, setSuspending] = useState(false);
 
   const navigate = useNavigate();
 
@@ -66,15 +69,24 @@ export default function Agents() {
     }
   };
 
-  const handleSuspend = async (id: string) => {
-    if (!confirm("Are you sure you want to suspend this agent lender?")) return;
+  const handleSuspend = (id: string) => {
+    setSuspendAgentId(id);
+  };
+
+  const executeSuspendAgent = async () => {
+    if (!suspendAgentId) return;
+    const id = suspendAgentId;
     try {
+      setSuspending(true);
       const updated = await usersService.suspendAgent(id);
       setAgents((prev) => prev.map((a) => (a.id === id ? updated : a)));
       if (selectedAgent?.id === id) setSelectedAgent(updated);
       toast.warning("Agent suspended successfully.");
+      setSuspendAgentId(null);
     } catch {
       toast.error("Failed to suspend agent.");
+    } finally {
+      setSuspending(false);
     }
   };
 
@@ -145,8 +157,8 @@ export default function Agents() {
             shape="circle"
           />
           <div className="min-w-0">
-            <div className="font-bold text-foreground truncate">{row.fullName || "Verified Agent"}</div>
-            <div className="text-[11px] text-muted-foreground font-mono truncate">{row.email}</div>
+            <div className="font-bold text-[var(--admin-text)] truncate">{row.fullName || "Verified Agent"}</div>
+            <div className="text-[11px] text-[var(--admin-text-muted)] font-mono truncate">{row.email}</div>
           </div>
         </div>
       ),
@@ -169,7 +181,7 @@ export default function Agents() {
       label: "Leases Completed",
       sortable: true,
       render: (row) => (
-        <span className="text-xs font-mono font-semibold text-foreground">
+        <span className="text-xs font-mono font-semibold text-[var(--admin-text)]">
           {row.bookingsCount || 0} bookings
         </span>
       ),
@@ -179,7 +191,7 @@ export default function Agents() {
       label: "Gross Revenue",
       sortable: true,
       render: (row) => (
-        <span className="text-xs font-mono font-bold text-foreground">
+        <span className="text-xs font-mono font-bold text-[var(--admin-text)]">
           ₹{(row.revenue || 0).toLocaleString("en-IN")}
         </span>
       ),
@@ -201,7 +213,7 @@ export default function Agents() {
       render: (row) => (
         <span
           className={cn(
-            "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border",
+            "px-2 py-0.5 rounded-full text-[11px] font-bold  border",
             row.status === "active"
               ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
               : "bg-destructive/10 text-destructive border-destructive/20"
@@ -222,7 +234,7 @@ export default function Agents() {
               setSelectedAgent(row);
               setModalOpen(true);
             }}
-            className="p-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground transition-all cursor-pointer"
+            className="p-1.5 rounded-lg bg-[var(--admin-elevated)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] transition-colors cursor-pointer"
             title="View agent details"
           >
             <Eye className="h-3.5 w-3.5" />
@@ -230,7 +242,7 @@ export default function Agents() {
           {row.status === "active" && (
             <button
               onClick={() => handleSuspend(row.id)}
-              className="p-1.5 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 transition-all cursor-pointer"
+              className="p-1.5 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 transition-colors cursor-pointer"
               title="Suspend agent"
             >
               <ShieldAlert className="h-3.5 w-3.5" />
@@ -256,12 +268,12 @@ export default function Agents() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-8">
       {/* HEADER (Panel 4) */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[rgba(161,161,170,0.18)] pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[var(--admin-border)] pb-5">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#F5F5F5]">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--admin-text)]">
             Agents
           </h1>
-          <p className="text-xs sm:text-sm text-[#A1A1AA]">
+          <p className="text-xs sm:text-sm text-[var(--admin-text-muted)]">
             Manage verified agents and vendor accounts.
           </p>
         </div>
@@ -270,7 +282,7 @@ export default function Agents() {
           <button
             onClick={fetchAgents}
             disabled={loading}
-            className="p-2 rounded-lg bg-[#10151B] border border-[rgba(161,161,170,0.18)] text-[#A1A1AA] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+            className="p-2 rounded-lg bg-[var(--admin-card)] border border-[var(--admin-border)] text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] transition-colors cursor-pointer"
             title="Refresh agents"
           >
             <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
@@ -279,7 +291,7 @@ export default function Agents() {
       </div>
 
       {/* TABS (Panel 4: All Agents, Pending, Verified) */}
-      <div className="flex items-center gap-2 border-b border-[rgba(161,161,170,0.18)] pb-2 overflow-x-auto no-scrollbar">
+      <div className="flex items-center gap-2 border-b border-[var(--admin-border)] pb-2 overflow-x-auto no-scrollbar">
         {[
           { id: "all", label: "All Agents", count: totalCount },
           { id: "pending", label: "Pending", count: pendingCount },
@@ -292,19 +304,19 @@ export default function Agents() {
               setCurrentPage(1);
             }}
             className={cn(
-              "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2",
+              "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap flex items-center gap-2",
               statusFilter === tab.id
-                ? "bg-white text-black font-bold shadow-xs"
-                : "text-[#A1A1AA] hover:text-[#F5F5F5] hover:bg-white/5"
+                ? "bg-[var(--admin-accent)] text-[var(--admin-bg)] font-semibold shadow-xs"
+                : "text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-elevated)]"
             )}
           >
             <span>{tab.label}</span>
             <span
               className={cn(
-                "px-1.5 py-0.5 rounded-full text-[10px] font-mono",
+                "px-1.5 py-0.5 rounded-full text-[11px] font-mono",
                 statusFilter === tab.id
-                  ? "bg-black/15 text-black"
-                  : "bg-white/10 text-zinc-300"
+                  ? "bg-white/20 dark:bg-black/15 text-[var(--admin-bg)]"
+                  : "bg-[var(--admin-elevated)] text-[var(--admin-text-muted)]"
               )}
             >
               {tab.count}
@@ -316,43 +328,43 @@ export default function Agents() {
       {/* SEARCH & ADD AGENT CONTROLS */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--admin-text-muted)]" />
           <input
             type="text"
-            placeholder="Search agents by name, email or phone..."
+            placeholder="Search agents by name, email, or phone"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full bg-[#050709] text-[#F5F5F5] text-xs rounded-lg pl-9 pr-3 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none focus:border-white/40 font-medium placeholder:text-zinc-500"
+            className="w-full bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-lg pl-9 pr-3 py-2 border border-[var(--admin-border)] focus:outline-none focus:border-[var(--admin-text)]/40 font-medium placeholder:text-[var(--admin-text-muted)]"
           />
         </div>
 
         <button
-          onClick={() => toast.info("Add agent requires vendor invitation.")}
-          className="px-3.5 py-2 rounded-lg bg-white text-black hover:bg-zinc-200 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs self-start sm:self-auto"
+          onClick={() => navigate({ to: "/admin/kyc" })}
+          className="px-3.5 py-2 rounded-lg bg-[var(--admin-elevated)] hover:bg-[var(--admin-card)] text-[var(--admin-text)] border border-[var(--admin-border)] text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
         >
-          <span>+ Add Agent</span>
+          <span>Vendor KYC queue</span>
         </button>
       </div>
 
       {/* 3-STATE CONTAINER: ERROR vs TABLE (LOADING / REAL DATA / EMPTY DB) */}
       {error ? (
-        <div className="bg-card border border-red-500/20 p-8 rounded-xl text-center space-y-3">
-          <div className="inline-flex p-2.5 rounded-full bg-red-500/10 text-[#FF1744]">
+        <div className="bg-[var(--admin-card)] border border-red-500/20 p-8 rounded-xl text-center space-y-3">
+          <div className="inline-flex p-2.5 rounded-full bg-red-500/10 text-[var(--admin-error)]">
             <ShieldAlert className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-foreground">Unable to Load Agents</h3>
-            <p className="text-xs text-muted-foreground mt-1">{error}</p>
+            <h3 className="text-sm font-semibold text-[var(--admin-text)]">Unable to Load Agents</h3>
+            <p className="text-xs text-[var(--admin-text-muted)] mt-1">{error}</p>
           </div>
           <div>
             <button
               onClick={() => fetchAgents()}
-              className="px-4 py-2 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-xs font-medium transition-colors border border-border/80 cursor-pointer inline-flex items-center gap-1.5"
+              className="px-4 py-2 rounded-lg bg-[var(--admin-elevated)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs font-medium transition-colors border border-[var(--admin-border)] cursor-pointer inline-flex items-center gap-1.5"
             >
-              <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />
+              <RefreshCw className="h-3.5 w-3.5 text-[var(--admin-text-muted)]" />
               <span>Retry Database Fetch</span>
             </button>
           </div>
@@ -387,9 +399,9 @@ export default function Agents() {
 
       {/* AGENT DETAIL MODAL */}
       {modalOpen && selectedAgent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-card border border-border/80 rounded-2xl shadow-2xl p-6 space-y-5">
-            <div className="flex items-center justify-between border-b border-border/40 pb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-in fade-in duration-150">
+          <div className="w-full max-w-lg bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-2xl shadow-2xl p-6 space-y-5">
+            <div className="flex items-center justify-between border-b border-[var(--admin-border)] pb-4">
               <div className="flex items-center gap-3">
                 <ProfilePhoto
                   src={(selectedAgent as any).profilePhotoUrl || (selectedAgent as any).profile_photo_url || selectedAgent.avatar}
@@ -398,44 +410,44 @@ export default function Agents() {
                   shape="circle"
                 />
                 <div>
-                  <h3 className="text-sm font-bold text-foreground">{selectedAgent.fullName || "Agent Profile"}</h3>
-                  <p className="text-[11px] text-muted-foreground font-mono">{selectedAgent.email}</p>
+                  <h3 className="text-sm font-bold text-[var(--admin-text)]">{selectedAgent.fullName || "Agent Profile"}</h3>
+                  <p className="text-[11px] text-[var(--admin-text-muted)] font-mono">{selectedAgent.email}</p>
                 </div>
               </div>
               <button
                 onClick={() => setModalOpen(false)}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
+                className="p-1.5 rounded-lg text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-elevated)] cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="p-3 rounded-xl bg-secondary/40 border border-border/60">
-                <span className="text-muted-foreground block text-[10px] uppercase font-bold">Listings</span>
-                <span className="text-base font-black font-mono mt-1 block">{selectedAgent.productsCount || 0}</span>
+              <div className="p-3 rounded-xl bg-[var(--admin-elevated)] border border-[var(--admin-border)]">
+                <span className="text-[var(--admin-text-muted)] block text-[11px] font-bold">Listings</span>
+                <span className="text-base font-semibold tabular-nums font-mono mt-1 block">{selectedAgent.productsCount || 0}</span>
               </div>
-              <div className="p-3 rounded-xl bg-secondary/40 border border-border/60">
-                <span className="text-muted-foreground block text-[10px] uppercase font-bold">Completed Leases</span>
-                <span className="text-base font-black font-mono mt-1 block">{selectedAgent.bookingsCount || 0}</span>
+              <div className="p-3 rounded-xl bg-[var(--admin-elevated)] border border-[var(--admin-border)]">
+                <span className="text-[var(--admin-text-muted)] block text-[11px] font-bold">Completed Leases</span>
+                <span className="text-base font-semibold tabular-nums font-mono mt-1 block">{selectedAgent.bookingsCount || 0}</span>
               </div>
-              <div className="p-3 rounded-xl bg-secondary/40 border border-border/60">
-                <span className="text-muted-foreground block text-[10px] uppercase font-bold">Gross Revenue</span>
-                <span className="text-base font-black font-mono mt-1 block">₹{(selectedAgent.revenue || 0).toLocaleString()}</span>
+              <div className="p-3 rounded-xl bg-[var(--admin-elevated)] border border-[var(--admin-border)]">
+                <span className="text-[var(--admin-text-muted)] block text-[11px] font-bold">Gross Revenue</span>
+                <span className="text-base font-semibold tabular-nums font-mono mt-1 block">₹{(selectedAgent.revenue || 0).toLocaleString()}</span>
               </div>
-              <div className="p-3 rounded-xl bg-secondary/40 border border-border/60">
-                <span className="text-muted-foreground block text-[10px] uppercase font-bold">Average Rating</span>
-                <span className="text-base font-black font-mono mt-1 block text-amber-500">★ {(selectedAgent.rating || 5.0).toFixed(1)}</span>
+              <div className="p-3 rounded-xl bg-[var(--admin-elevated)] border border-[var(--admin-border)]">
+                <span className="text-[var(--admin-text-muted)] block text-[11px] font-bold">Average Rating</span>
+                <span className="text-base font-semibold tabular-nums font-mono mt-1 block text-amber-500">★ {(selectedAgent.rating || 5.0).toFixed(1)}</span>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/40">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--admin-border)]">
               <button
                 onClick={() => {
                   setModalOpen(false);
                   handleViewProducts(selectedAgent.fullName || selectedAgent.email);
                 }}
-                className="px-4 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-xs hover:bg-primary/90 transition-all cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[var(--admin-accent)] text-[var(--admin-bg)] font-semibold text-xs hover:bg-[var(--admin-accent-hover)] transition-colors cursor-pointer"
               >
                 View Agent Products
               </button>
@@ -443,6 +455,16 @@ export default function Agents() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        isOpen={!!suspendAgentId}
+        onClose={() => setSuspendAgentId(null)}
+        onConfirm={executeSuspendAgent}
+        title="Suspend agent account"
+        description="This suspends the agent lender account and hides their gear listings until reactivated."
+        confirmLabel="Suspend agent"
+        destructive
+        loading={suspending}
+      />
     </div>
   );
 }

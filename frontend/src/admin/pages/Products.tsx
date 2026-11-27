@@ -21,6 +21,7 @@ import { useNavigate, useSearch, Link } from "@tanstack/react-router";
 import { adminWS } from "../services/websocket";
 import { AdminProductImage } from "../components/common/AdminProductImage";
 import { cn } from "@/lib/utils";
+import { ConfirmDialog } from "../components/layout/ConfirmDialog";
 
 export default function Products() {
   const [products, setProducts] = useState<AdminProduct[]>([]);
@@ -42,6 +43,7 @@ export default function Products() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const navigate = useNavigate();
 
@@ -123,13 +125,19 @@ export default function Products() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to permanently delete this listing?")) return;
+  const handleDelete = (id: string) => {
+    setDeleteTargetId(id);
+  };
+
+  const executeDeleteProduct = async () => {
+    if (!deleteTargetId) return;
+    const id = deleteTargetId;
     try {
       setActionLoadingId(id);
       await productsService.deleteProduct(id);
       setProducts((prev) => prev.filter((p) => p.id !== id));
       toast.success("Listing deleted permanently.");
+      setDeleteTargetId(null);
     } catch {
       toast.error("Failed to delete product.");
     } finally {
@@ -211,8 +219,8 @@ export default function Products() {
         <div className="flex items-center gap-3">
           <AdminProductImage src={row.image} alt={row.title} className="w-10 h-10 rounded-lg" />
           <div className="min-w-0">
-            <div className="font-bold text-foreground truncate max-w-xs">{row.title}</div>
-            <div className="text-[11px] text-muted-foreground truncate">{row.category} {row.brand ? `• ${row.brand}` : ""}</div>
+            <div className="font-bold text-[var(--admin-text)] truncate max-w-xs">{row.title}</div>
+            <div className="text-[11px] text-[var(--admin-text-muted)] truncate">{row.category} {row.brand ? `• ${row.brand}` : ""}</div>
           </div>
         </div>
       ),
@@ -222,8 +230,8 @@ export default function Products() {
       label: "Owner / Lender",
       render: (row) => (
         <div className="min-w-0">
-          <div className="font-semibold text-foreground truncate">{row.owner?.name || "Verified Lender"}</div>
-          <div className="text-[10px] text-muted-foreground font-mono truncate">{row.owner?.email || "—"}</div>
+          <div className="font-semibold text-[var(--admin-text)] truncate">{row.owner?.name || "Verified Lender"}</div>
+          <div className="text-[11px] text-[var(--admin-text-muted)] font-mono truncate">{row.owner?.email || "—"}</div>
         </div>
       ),
     },
@@ -237,14 +245,14 @@ export default function Products() {
               <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs">
                 ₹{row.approvedPriceRange.minPrice.toLocaleString("en-IN")} — ₹{row.approvedPriceRange.maxPrice.toLocaleString("en-IN")}
               </span>
-              <span className="text-[9px] font-mono text-muted-foreground uppercase">
+              <span className="text-[11px] font-mono text-[var(--admin-text-muted)]">
                 /{row.approvedPriceRange.unit || "day"} • SET
               </span>
             </div>
           );
         }
         return (
-          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-mono font-semibold uppercase bg-muted text-muted-foreground border border-border/60">
+          <span className="inline-block px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] border border-[var(--admin-border)]">
             PRICE NOT SET
           </span>
         );
@@ -264,7 +272,7 @@ export default function Products() {
           <div className="flex flex-col gap-1 items-start">
             <span
               className={cn(
-                "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border inline-flex items-center gap-1",
+                "px-2 py-0.5 rounded-full text-[11px] font-bold  border inline-flex items-center gap-1",
                 isApproved
                   ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                   : isPending
@@ -273,14 +281,14 @@ export default function Products() {
                   ? "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20"
                   : isRejected
                   ? "bg-destructive/10 text-destructive border-destructive/20"
-                  : "bg-secondary text-muted-foreground border-border/60"
+                  : "bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] border-[var(--admin-border)]"
               )}
             >
               <span className="h-1.5 w-1.5 rounded-full bg-current" />
               {isPending ? "Pending Review" : isNeedsCorrection ? "Needs Revision" : row.status}
             </span>
             {row.hidden && (
-              <span className="text-[9px] font-mono text-muted-foreground bg-secondary px-1.5 py-0.5 rounded border border-border/60">
+              <span className="text-[11px] font-mono text-[var(--admin-text-muted)] bg-[var(--admin-elevated)] px-1.5 py-0.5 rounded border border-[var(--admin-border)]">
                 Hidden
               </span>
             )}
@@ -293,7 +301,7 @@ export default function Products() {
       label: "Submitted Date",
       sortable: true,
       render: (row) => (
-        <span className="text-xs text-muted-foreground font-mono">
+        <span className="text-xs text-[var(--admin-text-muted)] font-mono">
           {row.createdAt ? new Date(row.createdAt).toLocaleDateString("en-IN") : "—"}
         </span>
       ),
@@ -307,7 +315,7 @@ export default function Products() {
           <Link
             to="/admin/products/$id"
             params={{ id: row.id }}
-            className="px-2.5 py-1 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+            className="px-2.5 py-1 rounded-lg bg-[var(--admin-accent)] text-[var(--admin-bg)] text-xs font-semibold hover:opacity-90 transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
             title="Open complete product review"
           >
             <span>Review</span>
@@ -317,7 +325,7 @@ export default function Products() {
           <button
             onClick={() => handleToggleHide(row.id)}
             disabled={actionLoadingId === row.id}
-            className="p-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+            className="p-1.5 rounded-lg bg-[var(--admin-elevated)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] transition-colors cursor-pointer"
             title={row.hidden ? "Unhide from marketplace" : "Hide from marketplace"}
           >
             <EyeOff className="h-3.5 w-3.5" />
@@ -326,7 +334,7 @@ export default function Products() {
           <button
             onClick={() => handleDelete(row.id)}
             disabled={actionLoadingId === row.id}
-            className="p-1.5 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 transition-all cursor-pointer"
+            className="p-1.5 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 transition-colors cursor-pointer"
             title="Delete listing"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -350,10 +358,10 @@ export default function Products() {
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-border/50">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#F5F5F5]">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--admin-text)]">
             Products
           </h1>
-          <p className="text-xs text-[#A1A1AA] mt-0.5 font-medium">
+          <p className="text-xs text-[var(--admin-text-muted)] mt-0.5 font-medium">
             Manage all listed equipment and rental products.
           </p>
         </div>
@@ -362,10 +370,10 @@ export default function Products() {
           <button
             onClick={() => fetchProducts()}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[rgba(161,161,170,0.18)] bg-[#10151B] hover:bg-[#171C23] text-[#F5F5F5] text-xs font-medium transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs font-medium transition-colors cursor-pointer"
             title="Refresh database"
           >
-            <RefreshCw className={cn("h-3.5 w-3.5 text-[#A1A1AA]", loading && "animate-spin")} />
+            <RefreshCw className={cn("h-3.5 w-3.5 text-[var(--admin-text-muted)]", loading && "animate-spin")} />
             <span>Refresh</span>
           </button>
           <button
@@ -381,7 +389,7 @@ export default function Products() {
       </div>
 
       {/* TABS: ALL | PENDING | ACTIVE | REJECTED */}
-      <div className="flex items-center gap-2 border-b border-[rgba(161,161,170,0.18)] pb-2 overflow-x-auto no-scrollbar">
+      <div className="flex items-center gap-2 border-b border-[var(--admin-border)] pb-2 overflow-x-auto no-scrollbar">
         {[
           { id: "all", label: "All Products", count: tabCounts.all },
           { id: "pending", label: "Pending Approval", count: tabCounts.pending },
@@ -395,17 +403,17 @@ export default function Products() {
               setCurrentPage(1);
             }}
             className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer flex items-center gap-2",
+              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap cursor-pointer flex items-center gap-2",
               statusFilter === tab.id
-                ? "bg-white text-black font-semibold shadow-xs"
-                : "text-[#A1A1AA] hover:text-[#F5F5F5] hover:bg-white/5 border border-transparent"
+                ? "bg-[var(--admin-accent)] text-[var(--admin-bg)] font-semibold shadow-xs"
+                : "text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-elevated)] border border-transparent"
             )}
           >
             <span>{tab.label}</span>
             <span
               className={cn(
-                "px-1.5 py-0.5 rounded-full text-[10px] font-mono",
-                statusFilter === tab.id ? "bg-black/15 text-black font-bold" : "bg-white/10 text-[#A1A1AA]"
+                "px-1.5 py-0.5 rounded-full text-[11px] font-mono",
+                statusFilter === tab.id ? "bg-white/20 dark:bg-black/15 text-[var(--admin-bg)] font-medium" : "bg-[var(--admin-elevated)] text-[var(--admin-text-muted)]"
               )}
             >
               {tab.count}
@@ -415,18 +423,18 @@ export default function Products() {
       </div>
 
       {/* SEARCH & FILTERS */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#10151B] p-3 rounded-xl border border-[rgba(161,161,170,0.18)]">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[var(--admin-card)] p-3 rounded-xl border border-[var(--admin-border)]">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#A1A1AA]" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--admin-text-muted)]" />
           <input
             type="text"
-            placeholder="Search products..."
+            placeholder="Search products"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full bg-[#050709] text-[#F5F5F5] text-xs rounded-lg pl-9 pr-3 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none focus:border-white/40 font-medium placeholder:text-[#A1A1AA]"
+            className="w-full bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-lg pl-9 pr-3 py-2 border border-[var(--admin-border)] focus:outline-none focus:border-[var(--admin-text)]/40 font-medium placeholder:text-[var(--admin-text-muted)]"
           />
         </div>
 
@@ -438,7 +446,7 @@ export default function Products() {
                 setCategoryFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="bg-[#050709] text-[#F5F5F5] text-xs rounded-lg px-2.5 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none font-medium cursor-pointer"
+              className="bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-lg px-2.5 py-2 border border-[var(--admin-border)] focus:outline-none font-medium cursor-pointer"
             >
               <option value="all">All Categories</option>
               {categories.map((c) => (
@@ -455,7 +463,7 @@ export default function Products() {
               setStatusFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="bg-[#050709] text-[#F5F5F5] text-xs rounded-lg px-2.5 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none font-medium cursor-pointer"
+            className="bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-lg px-2.5 py-2 border border-[var(--admin-border)] focus:outline-none font-medium cursor-pointer"
           >
             <option value="all">All Status</option>
             <option value="approved">Active</option>
@@ -467,17 +475,17 @@ export default function Products() {
 
       {/* ERROR STATE */}
       {error && !loading ? (
-        <div className="bg-[#10151B] rounded-xl border border-red-500/20 p-8 text-center flex flex-col items-center justify-center space-y-3">
+        <div className="bg-[var(--admin-card)] rounded-xl border border-red-500/20 p-8 text-center flex flex-col items-center justify-center space-y-3">
           <div className="w-10 h-10 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center">
             <ShieldAlert className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-[#F5F5F5]">Database Sync Failed</h3>
-            <p className="text-xs text-[#A1A1AA] mt-1 max-w-sm">{error}</p>
+            <h3 className="text-sm font-semibold text-[var(--admin-text)]">Database Sync Failed</h3>
+            <p className="text-xs text-[var(--admin-text-muted)] mt-1 max-w-sm">{error}</p>
           </div>
           <button
             onClick={() => fetchProducts()}
-            className="px-4 py-2 rounded-lg bg-[#171C23] hover:bg-[#171C23]/80 text-[#F5F5F5] text-xs font-medium transition-colors border border-[rgba(161,161,170,0.18)] cursor-pointer"
+            className="px-4 py-2 rounded-lg bg-[var(--admin-elevated)] hover:bg-[var(--admin-elevated)]/80 text-[var(--admin-text)] text-xs font-medium transition-colors border border-[var(--admin-border)] cursor-pointer"
           >
             Retry Database Fetch
           </button>
@@ -510,6 +518,16 @@ export default function Products() {
           )}
         </div>
       )}
+      <ConfirmDialog
+        isOpen={!!deleteTargetId}
+        onClose={() => setDeleteTargetId(null)}
+        onConfirm={executeDeleteProduct}
+        title="Delete product listing"
+        description="This permanently removes the product listing and cannot be undone."
+        confirmLabel="Delete listing"
+        destructive
+        loading={!!deleteTargetId && actionLoadingId === deleteTargetId}
+      />
     </div>
   );
 }

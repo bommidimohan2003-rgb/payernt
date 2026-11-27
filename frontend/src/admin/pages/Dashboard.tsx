@@ -2,47 +2,25 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
-  Users,
-  Package,
   Calendar,
-  IndianRupee,
   AlertTriangle,
-  ArrowRight,
   CheckCircle2,
-  XCircle,
   RefreshCw,
   Clock,
   ShieldCheck,
-  ShieldAlert,
-  UserCheck,
-  Eye,
-  Check,
   X,
-  TrendingUp,
-  FileText,
-  MessageSquare,
-  Truck,
-  Wallet,
-  Activity,
+  Package,
   Layers,
-  LifeBuoy,
-  Flag,
+  Activity,
   ArrowUpRight,
   BarChart3,
   Database,
-  Wifi,
-  ExternalLink,
-  Sparkles,
-  ChevronRight,
-  Shield,
   Award,
 } from "lucide-react";
 import {
   ResponsiveContainer,
   AreaChart,
   Area,
-  BarChart,
-  Bar,
   PieChart,
   Pie,
   Cell,
@@ -66,44 +44,12 @@ import {
   AdminUser,
   AdminReport,
   AdminSupportTicket,
-  adminApi,
   checkAdminHealth,
 } from "../services/api";
 import { adminWS, ConnectionStatus } from "../services/websocket";
 import { useTheme } from "@/hooks/useTheme";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-
-// Dashboard V14 Exact Visual Design Tokens
-const DASHBOARD_V14 = {
-  bg: "#F3F2F5",
-  card: "#FFFFFF",
-  secondaryBg: "#F8F7F9",
-  text: "#242424",
-  textSecondary: "#77757D",
-  muted: "#9E9DA4",
-  border: "#E6E4E9",
-  orangeStart: "#F9856A",
-  orangeEnd: "#FF7655",
-  selectedNav: "#242424",
-  success: "#10B981",
-  successBg: "#ECFDF5",
-  successText: "#059669",
-  warning: "#F59E0B",
-  warningBg: "#FFFBEB",
-  warningText: "#D97706",
-  danger: "#EF4444",
-  dangerBg: "#FEF2F2",
-  dangerText: "#DC2626",
-};
-
-const BOOKING_STATUS_COLORS: Record<string, string> = {
-  Active: DASHBOARD_V14.orangeEnd,
-  Pending: DASHBOARD_V14.warning,
-  Ongoing: DASHBOARD_V14.selectedNav,
-  Completed: DASHBOARD_V14.textSecondary,
-  Cancelled: DASHBOARD_V14.danger,
-};
 
 type AnalyticsTab = "Bookings" | "Products" | "Users" | "Delivery" | "Finance";
 type DateRange = "7D" | "30D" | "90D";
@@ -113,9 +59,8 @@ export function Dashboard() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
-  // ----------------------------------------------------------------------
-  // State Management
-  // ----------------------------------------------------------------------
+  const accentHex = isDark ? "#4CC38A" : "#047857";
+
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [charts, setCharts] = useState<DashboardCharts | null>(null);
   const [recentActivity, setRecentActivity] = useState<DashboardActivity[]>([]);
@@ -125,24 +70,20 @@ export function Dashboard() {
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [supportTickets, setSupportTickets] = useState<AdminSupportTicket[]>([]);
 
-  // Filter & Navigation State
   const [activeTab, setActiveTab] = useState<AnalyticsTab>("Bookings");
   const [dateRange, setDateRange] = useState<DateRange>("30D");
 
-  // Operational State
   const [pendingProductsList, setPendingProductsList] = useState<AdminProduct[]>([]);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [approvingUserId, setApprovingUserId] = useState<string | null>(null);
 
-  // Status & Telemetry
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string>("");
   const [wsStatus, setWsStatus] = useState<ConnectionStatus>("LIVE");
   const [healthStatus, setHealthStatus] = useState<"ok" | "degraded" | "checking">("ok");
 
-  // Map DateRange string to days count
   const days = useMemo(() => {
     switch (dateRange) {
       case "7D":
@@ -154,9 +95,6 @@ export function Dashboard() {
     }
   }, [dateRange]);
 
-  // ----------------------------------------------------------------------
-  // Data Fetching
-  // ----------------------------------------------------------------------
   const fetchDashboardData = useCallback(async (selectedDays: number, showToast = false) => {
     try {
       if (showToast) setIsRefreshing(true);
@@ -211,7 +149,6 @@ export function Dashboard() {
         setPendingProductsList(Array.isArray(val) ? val : ((val as any)?.items || []));
       }
 
-      // Check backend health silently
       try {
         const health = await checkAdminHealth();
         setHealthStatus(health);
@@ -224,21 +161,19 @@ export function Dashboard() {
         now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
       );
 
-      if (showToast) toast.success("Dashboard telemetry synchronized.");
+      if (showToast) toast.success("Dashboard synchronized");
     } catch {
-      if (showToast) toast.error("Failed to refresh dashboard data.");
+      if (showToast) toast.error("Failed to refresh dashboard data");
     } finally {
       setLoading(false);
       setIsRefreshing(false);
     }
   }, []);
 
-  // Initial Load
   useEffect(() => {
     fetchDashboardData(days, false);
   }, [days, fetchDashboardData]);
 
-  // Subscribe to WebSocket status & ensure connection is initiated
   useEffect(() => {
     adminWS.connect();
     const unsub = adminWS.onStatusChange((status) => {
@@ -247,15 +182,14 @@ export function Dashboard() {
     return () => unsub();
   }, []);
 
-  // Quick Action Handlers for Approvals
   const handleApproveProduct = async (id: string, title: string) => {
     try {
       setApprovingId(id);
       await productsService.approveProduct(id);
       setPendingProductsList((prev) => prev.filter((p) => p.id !== id));
-      toast.success(`Listing "${title}" approved & published.`);
+      toast.success(`Listing "${title}" approved`);
     } catch {
-      toast.error("Failed to approve product.");
+      toast.error("Failed to approve product");
     } finally {
       setApprovingId(null);
     }
@@ -266,9 +200,9 @@ export function Dashboard() {
       setRejectingId(id);
       await productsService.rejectProduct(id, "Does not meet platform specifications.");
       setPendingProductsList((prev) => prev.filter((p) => p.id !== id));
-      toast.info(`Listing "${title}" rejected.`);
+      toast.info(`Listing "${title}" rejected`);
     } catch {
-      toast.error("Failed to reject product.");
+      toast.error("Failed to reject product");
     } finally {
       setRejectingId(null);
     }
@@ -283,17 +217,14 @@ export function Dashboard() {
           u.id === id || u.accountId === id ? { ...u, status: "approved", verified: true } : u
         )
       );
-      toast.success(`User account "${name}" approved & verified.`);
+      toast.success(`Account "${name}" approved`);
     } catch {
-      toast.error("Failed to approve user.");
+      toast.error("Failed to approve user");
     } finally {
       setApprovingUserId(null);
     }
   };
 
-  // ----------------------------------------------------------------------
-  // Factual Metric Derivations
-  // ----------------------------------------------------------------------
   const pendingUsersList = useMemo(() => {
     return users.filter((u) => {
       if (u.role === "admin") return false;
@@ -315,15 +246,16 @@ export function Dashboard() {
     return reports.filter((r) => r.status === "open").length;
   }, [reports]);
 
-  // Core 4 KPI Values
   const totalBookingsVal = stats?.monthlyBookings ?? bookings.length;
   const activeRentalsVal =
     stats?.activeBookings ??
     bookings.filter((b) => ["active", "in_progress", "confirmed", "delivered"].includes(b.status)).length;
-  const pendingApprovalsVal = (stats?.pendingUsers ?? pendingUsersList.length) + (stats?.pendingProducts ?? pendingProductsList.length) + (stats?.pendingWithdrawals ?? 0);
+  const pendingApprovalsVal =
+    (stats?.pendingUsers ?? pendingUsersList.length) +
+    (stats?.pendingProducts ?? pendingProductsList.length) +
+    (stats?.pendingWithdrawals ?? 0);
   const openIssuesVal = openReportsCount + openSupportTicketsCount;
 
-  // Booking Distribution Donut Data
   const bookingDistributionData = useMemo(() => {
     const act = stats?.activeBookings ?? bookings.filter((b) => b.status === "active").length;
     const pend = bookings.filter((b) => b.status === "pending" || b.status === "requested").length;
@@ -332,26 +264,24 @@ export function Dashboard() {
     const canc = bookings.filter((b) => b.status === "cancelled").length;
 
     return [
-      { name: "Active", value: act, color: BOOKING_STATUS_COLORS.Active },
-      { name: "Pending", value: pend, color: BOOKING_STATUS_COLORS.Pending },
-      { name: "Ongoing", value: ong, color: BOOKING_STATUS_COLORS.Ongoing },
-      { name: "Completed", value: comp, color: BOOKING_STATUS_COLORS.Completed },
-      { name: "Cancelled", value: canc, color: BOOKING_STATUS_COLORS.Cancelled },
+      { name: "Active", value: act, color: accentHex },
+      { name: "Pending", value: pend, color: isDark ? "#F5B942" : "#D97706" },
+      { name: "Ongoing", value: ong, color: isDark ? "#85858B" : "#525252" },
+      { name: "Completed", value: comp, color: isDark ? "#52525B" : "#A1A1AA" },
+      { name: "Cancelled", value: canc, color: isDark ? "#E5484D" : "#C93636" },
     ];
-  }, [stats, bookings]);
+  }, [stats, bookings, accentHex, isDark]);
 
   const totalDistributedOrders = useMemo(() => {
     return bookingDistributionData.reduce((acc, curr) => acc + curr.value, 0);
   }, [bookingDistributionData]);
 
-  // Scheduled / Upcoming Bookings
   const upcomingBookingsList = useMemo(() => {
     return bookings
       .filter((b) => ["pending", "confirmed", "active"].includes(b.status))
       .slice(0, 5);
   }, [bookings]);
 
-  // Issues & Exceptions List
   const issuesList = useMemo(() => {
     const items: Array<{
       id: string;
@@ -368,7 +298,7 @@ export function Dashboard() {
         id: r.id,
         title: r.reason || `Report against ${r.reportedType || "entity"}`,
         type: "report",
-        severity: r.status === "open" ? "HIGH" : "NORMAL",
+        severity: r.status === "open" ? "High" : "Normal",
         date: r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "Recent",
         author: r.reporterName || "User",
         status: r.status || "open",
@@ -378,9 +308,9 @@ export function Dashboard() {
     supportTickets.slice(0, 3).forEach((t) => {
       items.push({
         id: t.id,
-        title: t.subject || "Customer Support Request",
+        title: t.subject || "Customer support request",
         type: "ticket",
-        severity: t.priority === "high" || t.priority === "urgent" ? "CRITICAL" : "NORMAL",
+        severity: t.priority === "high" || t.priority === "urgent" ? "Critical" : "Normal",
         date: t.createdAt ? new Date(t.createdAt).toLocaleDateString() : "Recent",
         author: t.userName || "Customer",
         status: t.status || "open",
@@ -390,7 +320,6 @@ export function Dashboard() {
     return items.slice(0, 5);
   }, [reports, supportTickets]);
 
-  // Top Rented Gear from charts or live products
   const topRentedGear = useMemo(() => {
     if (charts?.topProducts && charts.topProducts.length > 0) {
       return charts.topProducts.slice(0, 4).map((tp, idx) => ({
@@ -404,6 +333,14 @@ export function Dashboard() {
       .sort((a, b) => (b.rentalCount || b.reviewsCount || 0) - (a.rentalCount || a.reviewsCount || 0))
       .slice(0, 4);
   }, [charts, products]);
+
+  const deliveredRate = useMemo(() => {
+    if (!bookings.length) return 0;
+    const delivered = bookings.filter(
+      (b) => b.status === "completed" || b.deliveryStatus === "DELIVERED" || b.status === "active"
+    ).length;
+    return Math.round((delivered / bookings.length) * 100);
+  }, [bookings]);
 
   const activeChartConfig = useMemo(() => {
     switch (activeTab) {
@@ -443,11 +380,10 @@ export function Dashboard() {
     }
   }, [activeTab, charts]);
 
-  // Category Velocity
   const categoryVelocity = useMemo(() => {
     const counts: Record<string, number> = {};
     products.forEach((p) => {
-      const cat = p.category || "General Gear";
+      const cat = p.category || "General gear";
       counts[cat] = (counts[cat] || 0) + 1;
     });
     const total = products.length || 1;
@@ -461,7 +397,6 @@ export function Dashboard() {
       .slice(0, 4);
   }, [products]);
 
-  // Overdue Actions with factual duration
   const overdueActions = useMemo(() => {
     const list: Array<{ id: string; title: string; category: string; duration: string; urgent: boolean }> = [];
 
@@ -469,8 +404,8 @@ export function Dashboard() {
       list.push({
         id: `p-${p.id}`,
         title: `Verify gear listing "${p.title}"`,
-        category: "Catalog Moderation",
-        duration: idx === 0 ? "Pending for > 2 days" : "Pending review",
+        category: "Catalog moderation",
+        duration: idx === 0 ? "Priority review" : "Pending review",
         urgent: idx === 0,
       });
     });
@@ -479,8 +414,8 @@ export function Dashboard() {
       list.push({
         id: `u-${u.id}`,
         title: `Verify KYC documents for ${u.fullName || u.email}`,
-        category: "Identity Verification",
-        duration: idx === 0 ? "Pending for > 3 days" : "Pending review",
+        category: "Identity verification",
+        duration: idx === 0 ? "Priority review" : "Pending review",
         urgent: idx === 0,
       });
     });
@@ -488,26 +423,14 @@ export function Dashboard() {
     return list.slice(0, 4);
   }, [pendingProductsList, pendingUsersList]);
 
-  // ----------------------------------------------------------------------
-  // Motion Animation Variants
-  // ----------------------------------------------------------------------
   const containerVariants = {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
       transition: {
-        staggerChildren: shouldReduceMotion ? 0 : 0.04,
-        delayChildren: shouldReduceMotion ? 0 : 0.02,
+        duration: shouldReduceMotion ? 0 : 0.2,
+        ease: [0.22, 1, 0.36, 1] as const,
       },
-    },
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: shouldReduceMotion ? 0 : 10 },
-    show: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: shouldReduceMotion ? 0 : 0.22, ease: "easeOut" as const },
     },
   };
 
@@ -516,12 +439,12 @@ export function Dashboard() {
     show: {
       opacity: 1,
       y: 0,
-      transition: { duration: shouldReduceMotion ? 0 : 0.18, ease: "easeOut" as const },
+      transition: { duration: shouldReduceMotion ? 0 : 0.18, ease: [0.22, 1, 0.36, 1] as const },
     },
     exit: {
       opacity: 0,
       y: shouldReduceMotion ? 0 : -4,
-      transition: { duration: shouldReduceMotion ? 0 : 0.12, ease: "easeIn" as const },
+      transition: { duration: shouldReduceMotion ? 0 : 0.12, ease: [0.22, 1, 0.36, 1] as const },
     },
   };
 
@@ -530,252 +453,196 @@ export function Dashboard() {
       variants={containerVariants}
       initial="hidden"
       animate="show"
-      className="space-y-6 pb-12 font-sans"
+      className="space-y-6 pb-12"
     >
-      {/* ------------------------------------------------------------------ */}
-      {/* 1. EDITORIAL HEADER & ACTION BAR */}
-      {/* ------------------------------------------------------------------ */}
-      <motion.div
-        variants={itemVariants}
-        className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-1"
-      >
+      {/* 1. Header & Action Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[var(--admin-border)]">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-[#FF7655]" />
-            <span className="text-[11px] font-mono uppercase tracking-widest text-[#77757D] dark:text-[#9AAAC2] font-bold">
-              Payent Platform Governance
-            </span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-[#242424] dark:text-[#F8FAFC]">
-            Dashboard Overview
-          </h1>
-          <p className="text-xs sm:text-sm text-[#77757D] dark:text-[#9AAAC2] max-w-2xl font-normal">
-            Platform performance, operational queue, and actions requiring administrative attention.
+          <h2 className="text-2xl font-semibold text-[var(--admin-text)]">
+            Operations overview
+          </h2>
+          <p className="text-xs text-[var(--admin-text-secondary)]">
+            Platform performance, review queue, and operational status
           </p>
         </div>
 
         {/* Global Controls: Telemetry, Date Range & Refresh */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Live Telemetry Status Badge */}
-          <div className="flex items-center px-3 py-1.5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] text-xs font-semibold text-[#242424] dark:text-[#F8FAFC] shadow-xs">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center gap-2 px-3 h-8 rounded-lg bg-[var(--admin-card)] border border-[var(--admin-border)] text-xs text-[var(--admin-text-secondary)]">
             <span
               className={cn(
-                "h-2 w-2 rounded-full mr-2",
+                "h-2 w-2 rounded-full",
                 wsStatus === "LIVE"
-                  ? "bg-[#10B981] animate-pulse"
+                  ? "bg-[var(--admin-success)]"
                   : wsStatus === "CONNECTING"
-                  ? "bg-[#F59E0B]"
-                  : "bg-[#77757D]"
+                  ? "bg-[var(--admin-warning)]"
+                  : "bg-[var(--admin-text-muted)]"
               )}
             />
-            <span className="text-[11px] capitalize">
-              {wsStatus === "LIVE" ? "Live Stream" : wsStatus === "CONNECTING" ? "Connecting" : "Online"}
+            <span>
+              {wsStatus === "LIVE" ? "Live stream" : wsStatus === "CONNECTING" ? "Connecting" : "Synced"}
             </span>
           </div>
 
-          {/* Date Range Selector Pills with Smooth Spring Motion */}
-          <div className="bg-[#F8F7F9] dark:bg-[#1E1E1E] p-1 rounded-xl border border-[#E6E4E9] dark:border-[#273244] flex items-center gap-1 shadow-xs">
+          <div className="bg-[var(--admin-elevated)] p-1 rounded-lg border border-[var(--admin-border)] flex items-center gap-1">
             {(["7D", "30D", "90D"] as DateRange[]).map((range) => (
               <button
                 key={range}
                 onClick={() => setDateRange(range)}
                 className={cn(
-                  "relative px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer",
+                  "px-3 h-6 text-xs font-medium rounded-md transition-colors cursor-pointer tabular-nums",
                   dateRange === range
-                    ? "text-white dark:text-[#070B14]"
-                    : "text-[#77757D] dark:text-[#9AAAC2] hover:text-[#242424] dark:hover:text-[#F8FAFC]"
+                    ? "bg-[var(--admin-card)] text-[var(--admin-text)] border border-[var(--admin-border)]"
+                    : "text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)]"
                 )}
               >
-                {dateRange === range && (
-                  <motion.span
-                    layoutId="activeDatePill"
-                    className="absolute inset-0 rounded-lg bg-[#242424] dark:bg-white shadow-xs"
-                    transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                  />
-                )}
-                <span className="relative z-10">{range}</span>
+                {range}
               </button>
             ))}
           </div>
 
-          {/* Sync Timestamp & Manual Refresh */}
-          <div className="flex items-center gap-1 text-[11px] font-mono text-[#77757D] dark:text-[#9AAAC2] px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] shadow-xs">
-            <Clock className="h-3.5 w-3.5 text-[#77757D] dark:text-[#9AAAC2]" />
-            <span>Synced {lastSyncTime || "Realtime"}</span>
+          <div className="inline-flex items-center gap-1.5 text-xs font-mono tabular-nums text-[var(--admin-text-secondary)] px-3 h-8 rounded-lg bg-[var(--admin-card)] border border-[var(--admin-border)]">
+            <Clock className="h-3.5 w-3.5 text-[var(--admin-text-muted)]" strokeWidth={1.5} />
+            <span>{lastSyncTime || "Synced"}</span>
           </div>
 
-          <motion.button
-            whileTap={{ scale: 0.94 }}
+          <button
             onClick={() => fetchDashboardData(days, true)}
             disabled={isRefreshing}
-            className="p-2 rounded-xl bg-white dark:bg-[#1E1E1E] hover:bg-[#F8F7F9] dark:hover:bg-[#162238] text-[#77757D] dark:text-[#9AAAC2] hover:text-[#242424] dark:hover:text-[#F8FAFC] border border-[#E6E4E9] dark:border-[#273244] shadow-xs transition-colors cursor-pointer disabled:opacity-50"
-            title="Refresh dashboard telemetry"
+            className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--admin-card)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] border border-[var(--admin-border)] transition-colors cursor-pointer disabled:opacity-50 active:scale-[0.98]"
+            title="Refresh dashboard"
+            aria-label="Refresh dashboard"
           >
             <RefreshCw
-              className={cn("h-4 w-4", isRefreshing && "animate-spin text-[#FF7655]")}
+              className={cn("h-4 w-4", isRefreshing && "animate-spin")}
+              strokeWidth={1.5}
             />
-          </motion.button>
+          </button>
         </div>
-      </motion.div>
+      </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* 2. CORE KPI CARDS (FEATURING PROMINENT CORAL-ORANGE GRADIENT CARD) */}
-      {/* ------------------------------------------------------------------ */}
-      <motion.div
-        variants={itemVariants}
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5"
-      >
-        {/* KPI CARD 1: TOTAL BOOKINGS — SIGNATURE CORAL-ORANGE GRADIENT CARD */}
-        <motion.div
-          whileHover={{ y: -3, scale: 1.005 }}
-          transition={{ duration: 0.15 }}
-          className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#F9856A] to-[#FF7655] p-5 sm:p-6 text-white shadow-[0_10px_25px_-5px_rgba(255,118,85,0.32)] flex flex-col justify-between"
-        >
-          {/* Subtle background ambient graphic overlay */}
-          <div className="absolute -top-12 -right-12 w-36 h-36 rounded-full bg-white/10 blur-2xl pointer-events-none" />
-          <div className="absolute -bottom-10 -left-10 w-28 h-28 rounded-full bg-black/5 blur-xl pointer-events-none" />
-
-          <div className="relative z-10 flex items-start justify-between">
-            <div className="space-y-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-white/80">
-                Total Bookings
-              </span>
-              <div className="text-3xl sm:text-4xl font-black text-white tracking-tight mt-1">
-                {totalBookingsVal.toLocaleString()}
-              </div>
-            </div>
-            <div className="p-2.5 rounded-xl bg-white/20 backdrop-blur-xs text-white border border-white/25 shadow-xs">
-              <Calendar className="h-5 w-5" />
-            </div>
+      {/* 2. Core KPI Row (Quiet Neutral Cards with Semantic Numbers) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* KPI 1: Total Bookings */}
+        <div className="rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] p-5 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-[var(--admin-text-secondary)]">
+              Total bookings
+            </span>
+            <Calendar className="h-4 w-4 text-[var(--admin-text-muted)]" strokeWidth={1.5} />
           </div>
-
-          <div className="relative z-10 pt-4 mt-2 border-t border-white/20 flex items-center justify-between text-xs">
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/20 text-white font-semibold text-[11px]">
+          <div className="text-3xl font-medium text-[var(--admin-text)] tabular-nums my-3">
+            {loading ? "—" : totalBookingsVal.toLocaleString()}
+          </div>
+          <div className="pt-3 border-t border-[var(--admin-border)] flex items-center justify-between text-xs">
+            <span className="text-[var(--admin-success)] font-medium tabular-nums">
               +{stats?.todayBookings || 0} today
             </span>
             <Link
               to="/admin/bookings"
-              className="text-white font-bold hover:underline inline-flex items-center gap-1 transition-transform hover:translate-x-0.5"
+              className="text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] font-medium inline-flex items-center gap-1 transition-colors"
             >
-              View Bookings ↗
+              <span>Bookings</span>
+              <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.5} />
             </Link>
           </div>
-        </motion.div>
+        </div>
 
-        {/* KPI CARD 2: ACTIVE RENTALS (ADAPTIVE LIGHT/DARK CARD) */}
-        <motion.div
-          whileHover={{ y: -3 }}
-          transition={{ duration: 0.15 }}
-          className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
-        >
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-[#77757D] dark:text-[#9AAAC2]">
-                Active Rentals
-              </span>
-              <div className="text-3xl sm:text-4xl font-black text-[#242424] dark:text-[#F8FAFC] tracking-tight mt-1">
-                {activeRentalsVal.toLocaleString()}
-              </div>
-            </div>
-            <div className="p-2.5 rounded-xl bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 shadow-xs">
-              <Package className="h-5 w-5" />
-            </div>
+        {/* KPI 2: Active Rentals */}
+        <div className="rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] p-5 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-[var(--admin-text-secondary)]">
+              Active rentals
+            </span>
+            <Package className="h-4 w-4 text-[var(--admin-text-muted)]" strokeWidth={1.5} />
           </div>
-
-          <div className="pt-4 mt-2 border-t border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between text-xs">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 font-semibold text-[11px]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#10B981]" />
-              In circulation
+          <div className="text-3xl font-medium text-[var(--admin-text)] tabular-nums my-3">
+            {loading ? "—" : activeRentalsVal.toLocaleString()}
+          </div>
+          <div className="pt-3 border-t border-[var(--admin-border)] flex items-center justify-between text-xs">
+            <span className="inline-flex items-center gap-1.5 text-[var(--admin-text-secondary)]">
+              <span className="h-2 w-2 rounded-full bg-[var(--admin-success)]" />
+              <span>In circulation</span>
             </span>
             <Link
               to="/admin/bookings"
-              className="text-[#77757D] hover:text-[#242424] dark:text-[#9AAAC2] dark:hover:text-[#F8FAFC] font-semibold inline-flex items-center gap-1"
+              className="text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] font-medium inline-flex items-center gap-1 transition-colors"
             >
-              Roster ↗
+              <span>Roster</span>
+              <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.5} />
             </Link>
           </div>
-        </motion.div>
+        </div>
 
-        {/* KPI CARD 3: PENDING APPROVALS (ADAPTIVE LIGHT/DARK CARD WITH WARM AMBER ACCENTS) */}
-        <motion.div
-          whileHover={{ y: -3 }}
-          transition={{ duration: 0.15 }}
-          className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
-        >
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-[#77757D] dark:text-[#9AAAC2]">
-                Pending Approvals
-              </span>
-              <div className="text-3xl sm:text-4xl font-black text-[#242424] dark:text-[#F8FAFC] tracking-tight mt-1">
-                {pendingApprovalsVal.toLocaleString()}
-              </div>
-            </div>
-            <div className="p-2.5 rounded-xl bg-[#FFFBEB] text-[#D97706] border border-[#FDE68A] dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20 shadow-xs">
-              <Clock className="h-5 w-5" />
-            </div>
+        {/* KPI 3: Pending Approvals */}
+        <div className="rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] p-5 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-[var(--admin-text-secondary)]">
+              Pending approvals
+            </span>
+            <Clock className="h-4 w-4 text-[var(--admin-text-muted)]" strokeWidth={1.5} />
           </div>
-
-          <div className="pt-4 mt-2 border-t border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between text-xs">
-            <span className="text-[#77757D] dark:text-[#9AAAC2] font-medium text-[11px]">
-              <span className="font-bold text-[#D97706] dark:text-amber-400">{stats?.pendingUsers || pendingUsersList.length}</span> KYC ·{" "}
-              <span className="font-bold text-[#D97706] dark:text-amber-400">{stats?.pendingProducts || pendingProductsList.length}</span> Gear
+          <div className="text-3xl font-medium text-[var(--admin-text)] tabular-nums my-3">
+            {loading ? "—" : pendingApprovalsVal.toLocaleString()}
+          </div>
+          <div className="pt-3 border-t border-[var(--admin-border)] flex items-center justify-between text-xs">
+            <span className="text-[var(--admin-text-secondary)] tabular-nums">
+              <strong className="font-medium text-[var(--admin-warning)]">
+                {stats?.pendingUsers ?? pendingUsersList.length}
+              </strong>{" "}
+              KYC ·{" "}
+              <strong className="font-medium text-[var(--admin-warning)]">
+                {stats?.pendingProducts ?? pendingProductsList.length}
+              </strong>{" "}
+              gear
             </span>
             <a
               href="#operational-queue"
-              className="text-[#D97706] hover:text-[#B45309] dark:text-amber-400 dark:hover:text-amber-300 font-bold inline-flex items-center gap-1"
+              className="text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] font-medium inline-flex items-center gap-1 transition-colors"
             >
-              Review ↗
+              <span>Review</span>
+              <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.5} />
             </a>
           </div>
-        </motion.div>
+        </div>
 
-        {/* KPI CARD 4: OPEN ISSUES (ADAPTIVE LIGHT/DARK CARD WITH MUTED RED ACCENTS) */}
-        <motion.div
-          whileHover={{ y: -3 }}
-          transition={{ duration: 0.15 }}
-          className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
-        >
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-[#77757D] dark:text-[#9AAAC2]">
-                Open Issues
-              </span>
-              <div className="text-3xl sm:text-4xl font-black text-[#242424] dark:text-[#F8FAFC] tracking-tight mt-1">
-                {openIssuesVal.toLocaleString()}
-              </div>
-            </div>
-            <div className="p-2.5 rounded-xl bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20 shadow-xs">
-              <AlertTriangle className="h-5 w-5" />
-            </div>
+        {/* KPI 4: Open Issues */}
+        <div className="rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] p-5 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-[var(--admin-text-secondary)]">
+              Open issues
+            </span>
+            <AlertTriangle className="h-4 w-4 text-[var(--admin-text-muted)]" strokeWidth={1.5} />
           </div>
-
-          <div className="pt-4 mt-2 border-t border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between text-xs">
-            <span className="text-[#77757D] dark:text-[#9AAAC2] font-medium text-[11px]">
-              <span className="font-bold text-[#DC2626] dark:text-red-400">{openReportsCount}</span> Reports ·{" "}
-              <span className="font-bold text-[#DC2626] dark:text-red-400">{openSupportTicketsCount}</span> Support
+          <div className="text-3xl font-medium text-[var(--admin-text)] tabular-nums my-3">
+            {loading ? "—" : openIssuesVal.toLocaleString()}
+          </div>
+          <div className="pt-3 border-t border-[var(--admin-border)] flex items-center justify-between text-xs">
+            <span className="text-[var(--admin-text-secondary)] tabular-nums">
+              <strong className="font-medium text-[var(--admin-error)]">
+                {openReportsCount}
+              </strong>{" "}
+              reports ·{" "}
+              <strong className="font-medium text-[var(--admin-error)]">
+                {openSupportTicketsCount}
+              </strong>{" "}
+              support
             </span>
             <Link
               to="/admin/reports"
-              className="text-[#DC2626] hover:text-[#B91C1C] dark:text-red-400 dark:hover:text-red-300 font-bold inline-flex items-center gap-1"
+              className="text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] font-medium inline-flex items-center gap-1 transition-colors"
             >
-              Action ↗
+              <span>Resolve</span>
+              <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.5} />
             </Link>
           </div>
-        </motion.div>
-      </motion.div>
+        </div>
+      </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* 3. ANALYTICS TABS & CHARTS (ADAPTIVE LIGHT/DARK PANEL) */}
-      {/* ------------------------------------------------------------------ */}
-      <motion.div
-        variants={itemVariants}
-        className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 sm:p-6 shadow-xs space-y-6"
-      >
-        {/* Navigation Tabs Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E6E4E9] dark:border-[#273244] pb-4">
-          {/* Rounded Tabs Container */}
-          <div className="bg-[#F8F7F9] dark:bg-[#1E1E1E] p-1.5 rounded-2xl border border-[#E6E4E9] dark:border-[#273244] inline-flex flex-wrap items-center gap-1">
+      {/* 3. Primary Chart & Distribution Panel (Asymmetric 2/3 + 1/3 Moment) */}
+      <div className="rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] p-6 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--admin-border)] pb-4">
+          <div className="bg-[var(--admin-elevated)] p-1 rounded-lg border border-[var(--admin-border)] inline-flex flex-wrap items-center gap-1">
             {(["Bookings", "Products", "Users", "Delivery", "Finance"] as AnalyticsTab[]).map(
               (tab) => {
                 const isActive = activeTab === tab;
@@ -784,67 +651,60 @@ export function Dashboard() {
                     key={tab}
                     onClick={() => setActiveTab(tab)}
                     className={cn(
-                      "relative px-4 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer",
+                      "px-3 h-7 text-xs font-medium rounded-md transition-colors cursor-pointer",
                       isActive
-                        ? "text-white dark:text-[#070B14]"
-                        : "text-[#77757D] dark:text-[#9AAAC2] hover:text-[#242424] dark:hover:text-[#F8FAFC]"
+                        ? "bg-[var(--admin-card)] text-[var(--admin-text)] border border-[var(--admin-border)]"
+                        : "text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] border border-transparent"
                     )}
                   >
-                    {isActive && (
-                      <motion.span
-                        layoutId="activeAnalyticsTab"
-                        className="absolute inset-0 rounded-xl bg-[#242424] dark:bg-white shadow-xs"
-                        transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                      />
-                    )}
-                    <span className="relative z-10">{tab}</span>
+                    {tab}
                   </button>
                 );
               }
             )}
           </div>
 
-          <div className="text-xs font-medium text-[#77757D] dark:text-[#9AAAC2] hidden sm:block">
-            Active Window: <span className="font-bold text-[#242424] dark:text-[#F8FAFC]">Last {days} Days</span>
+          <div className="text-xs text-[var(--admin-text-secondary)] tabular-nums hidden sm:block">
+            Window: <span className="font-medium text-[var(--admin-text)]">Last {days} days</span>
           </div>
         </div>
 
-        {/* Active Tab Analytics Charts Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Primary Trend Chart (2 Cols) */}
-          <div className="lg:col-span-2 space-y-3">
-            <div className="flex items-center justify-between">
+          <div className="lg:col-span-2 space-y-4">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 className="text-sm font-bold text-[#242424] dark:text-[#F8FAFC]">
-                  {activeTab === "Bookings" && "Booking Performance"}
-                  {activeTab === "Products" && "Catalog Equipment Growth"}
-                  {activeTab === "Users" && "User Acquisition Velocity"}
-                  {activeTab === "Delivery" && "Delivery SLA Fulfillment"}
-                  {activeTab === "Finance" && "Gross Merchandise Value (GMV)"}
+                <h3 className="text-sm font-semibold text-[var(--admin-text)]">
+                  {activeTab === "Bookings" && "Booking volume"}
+                  {activeTab === "Products" && "Equipment listings"}
+                  {activeTab === "Users" && "Account registrations"}
+                  {activeTab === "Delivery" && "Delivery fulfillment"}
+                  {activeTab === "Finance" && "Gross rental volume"}
                 </h3>
-                <p className="text-xs text-[#77757D] dark:text-[#9AAAC2]">
-                  {activeTab === "Bookings" && "Daily reservation rate across the marketplace"}
-                  {activeTab === "Products" && "Total gear listings registered across all categories"}
-                  {activeTab === "Users" && "New customer, lender, and delivery agent registrations"}
-                  {activeTab === "Delivery" && "On-time dropoff and return pickup execution rate"}
-                  {activeTab === "Finance" && "Platform transaction volume and commission payouts"}
+                <p className="text-xs text-[var(--admin-text-secondary)] mt-0.5">
+                  {activeTab === "Bookings" && "Daily reservation count across the marketplace"}
+                  {activeTab === "Products" && "Hardware listings added across categories"}
+                  {activeTab === "Users" && "New customer, lender, and courier registrations"}
+                  {activeTab === "Delivery" && "Completed and active handover rate across orders"}
+                  {activeTab === "Finance" && "Processed transaction turnover"}
                 </p>
               </div>
 
-              <div className="text-right">
-                <div className="text-sm font-black text-[#242424] dark:text-[#F8FAFC]">
-                  {activeTab === "Bookings" && `${totalBookingsVal} Total`}
-                  {activeTab === "Products" && `${products.length} Listings`}
-                  {activeTab === "Users" && `${users.length} Accounts`}
-                  {activeTab === "Delivery" && "98.4% On-Time"}
-                  {activeTab === "Finance" && `₹${((stats?.totalRevenue ?? stats?.monthlyRevenue) || 0).toLocaleString()}`}
+              <div className="text-right shrink-0">
+                <div className="text-sm font-semibold text-[var(--admin-text)] tabular-nums">
+                  {activeTab === "Bookings" && `${totalBookingsVal.toLocaleString()} orders`}
+                  {activeTab === "Products" && `${products.length.toLocaleString()} listings`}
+                  {activeTab === "Users" && `${users.length.toLocaleString()} accounts`}
+                  {activeTab === "Delivery" && `${deliveredRate}% fulfilled`}
+                  {activeTab === "Finance" && `₹${((stats?.totalRevenue ?? stats?.monthlyRevenue) || 0).toLocaleString("en-IN")}`}
                 </div>
-                <span className="text-[10px] text-[#77757D] dark:text-[#9AAAC2] font-mono">Last {days} days</span>
+                <span className="text-xs font-mono text-[var(--admin-text-muted)] tabular-nums">
+                  Last {days} days
+                </span>
               </div>
             </div>
 
-            {/* Chart Area with Smooth Transition */}
-            <div className="h-[260px] w-full pt-2">
+            <div className="h-72 w-full pt-2">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={activeTab}
@@ -858,58 +718,58 @@ export function Dashboard() {
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart
                         data={activeChartConfig.data}
-                        margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                        margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
                       >
                         <defs>
-                          <linearGradient id="v14AreaGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#FF7655" stopOpacity={0.25} />
-                            <stop offset="95%" stopColor="#FF7655" stopOpacity={0} />
+                          <linearGradient id="payentAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={accentHex} stopOpacity={0.22} />
+                            <stop offset="95%" stopColor={accentHex} stopOpacity={0} />
                           </linearGradient>
                         </defs>
                         <CartesianGrid
-                          stroke={isDark ? "#273244" : "#F0EFF2"}
+                          stroke={isDark ? "rgba(237,237,237,0.06)" : "rgba(23,23,23,0.06)"}
                           strokeDasharray="3 3"
                           vertical={false}
                         />
                         <XAxis
                           dataKey="name"
-                          stroke={isDark ? "#9AAAC2" : "#77757D"}
+                          stroke={isDark ? "#85858B" : "#737373"}
                           fontSize={11}
                           tickLine={false}
-                          axisLine={{ stroke: isDark ? "#273244" : "#E6E4E9" }}
+                          axisLine={{ stroke: isDark ? "rgba(237,237,237,0.08)" : "rgba(23,23,23,0.08)" }}
                         />
                         <YAxis
-                          stroke={isDark ? "#9AAAC2" : "#77757D"}
+                          stroke={isDark ? "#85858B" : "#737373"}
                           fontSize={11}
                           tickLine={false}
                           axisLine={false}
                         />
                         <Tooltip
                           contentStyle={{
-                            backgroundColor: isDark ? "#111827" : "#FFFFFF",
-                            borderColor: isDark ? "#273244" : "#E6E4E9",
-                            borderRadius: 12,
-                            boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
-                            color: isDark ? "#F8FAFC" : "#242424",
+                            backgroundColor: isDark ? "#232325" : "#FFFFFF",
+                            borderColor: isDark ? "rgba(237,237,237,0.12)" : "rgba(23,23,23,0.12)",
+                            borderRadius: 8,
+                            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                            color: isDark ? "#EDEDED" : "#171717",
                             fontSize: 12,
                           }}
-                          labelStyle={{ color: isDark ? "#9AAAC2" : "#77757D", fontWeight: 600 }}
+                          labelStyle={{ color: isDark ? "#A1A1A6" : "#525252", fontWeight: 500 }}
                         />
                         <Area
                           type="monotone"
                           dataKey={activeChartConfig.dataKey}
-                          stroke="#FF7655"
-                          strokeWidth={2.5}
+                          stroke={accentHex}
+                          strokeWidth={2}
                           fillOpacity={1}
-                          fill="url(#v14AreaGrad)"
+                          fill="url(#payentAreaGrad)"
                           isAnimationActive={!shouldReduceMotion}
                         />
                       </AreaChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-[#F8F7F9] dark:bg-[#1E1E1E]/60 rounded-xl border border-dashed border-[#E6E4E9] dark:border-[#273244] text-xs text-[#77757D] dark:text-[#9AAAC2]">
-                      <BarChart3 className="h-6 w-6 mb-2 text-[#9E9DA4]" />
-                      <span>No {activeTab.toLowerCase()} trend telemetry in selected period.</span>
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-[var(--admin-elevated)]/40 rounded-lg border border-dashed border-[var(--admin-border)] text-xs text-[var(--admin-text-muted)]">
+                      <BarChart3 className="h-5 w-5 mb-2 text-[var(--admin-text-muted)]" strokeWidth={1.5} />
+                      <span>No {activeTab.toLowerCase()} telemetry in selected window</span>
                     </div>
                   )}
                 </motion.div>
@@ -917,23 +777,23 @@ export function Dashboard() {
             </div>
           </div>
 
-          {/* Secondary Distribution Panel: Donut Chart (1 Col) */}
-          <div className="bg-[#F8F7F9] dark:bg-[#1E1E1E] rounded-xl border border-[#E6E4E9] dark:border-[#273244] p-4 flex flex-col justify-between">
-            <div className="flex items-center justify-between pb-2 border-b border-[#E6E4E9] dark:border-[#273244]">
-              <span className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC]">
-                Booking Status Distribution
+          {/* Secondary Distribution Panel (1 Col) */}
+          <div className="bg-[var(--admin-elevated)]/50 rounded-xl border border-[var(--admin-border)] p-4 flex flex-col justify-between">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--admin-border)]">
+              <span className="text-xs font-semibold text-[var(--admin-text)]">
+                Order status
               </span>
-              <span className="text-[10px] font-mono text-[#77757D] dark:text-[#9AAAC2]">Realtime</span>
+              <span className="text-xs font-mono text-[var(--admin-text-muted)]">Breakdown</span>
             </div>
 
-            <div className="relative h-[160px] flex items-center justify-center my-2">
+            <div className="relative h-40 flex items-center justify-center my-2">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={bookingDistributionData.filter((d) => d.value > 0)}
-                    innerRadius={50}
-                    outerRadius={70}
-                    paddingAngle={3}
+                    innerRadius={48}
+                    outerRadius={68}
+                    paddingAngle={2}
                     dataKey="value"
                     isAnimationActive={!shouldReduceMotion}
                   >
@@ -941,7 +801,7 @@ export function Dashboard() {
                       <Cell
                         key={`cell-${index}`}
                         fill={entry.color}
-                        stroke={isDark ? "#162238" : "#FFFFFF"}
+                        stroke={isDark ? "#19191B" : "#FFFFFF"}
                         strokeWidth={2}
                       />
                     ))}
@@ -950,27 +810,24 @@ export function Dashboard() {
               </ResponsiveContainer>
 
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-xl font-black text-[#242424] dark:text-[#F8FAFC]">
+                <span className="text-xl font-medium text-[var(--admin-text)] tabular-nums">
                   {totalDistributedOrders}
                 </span>
-                <span className="text-[9px] uppercase tracking-wider font-bold text-[#77757D] dark:text-[#9AAAC2]">
-                  Orders
-                </span>
+                <span className="text-xs text-[var(--admin-text-muted)]">Orders</span>
               </div>
             </div>
 
-            {/* Distribution Legend */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-2 border-t border-[#E6E4E9] dark:border-[#273244]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-3 border-t border-[var(--admin-border)]">
               {bookingDistributionData.map((item) => (
                 <div key={item.name} className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 truncate">
+                  <div className="flex items-center gap-2 truncate">
                     <span
                       className="h-2 w-2 rounded-full shrink-0"
                       style={{ backgroundColor: item.color }}
                     />
-                    <span className="text-[#77757D] dark:text-[#9AAAC2] truncate">{item.name}</span>
+                    <span className="text-[var(--admin-text-secondary)] truncate">{item.name}</span>
                   </div>
-                  <span className="font-mono font-bold text-[#242424] dark:text-[#F8FAFC] ml-1">
+                  <span className="font-mono font-medium text-[var(--admin-text)] tabular-nums ml-2">
                     {item.value}
                   </span>
                 </div>
@@ -978,186 +835,190 @@ export function Dashboard() {
             </div>
           </div>
         </div>
-      </motion.div>
+      </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* 4. SECONDARY ANALYTICS: TOP GEAR, VELOCITY, COMPLIANCE */}
-      {/* ------------------------------------------------------------------ */}
-      <motion.div
-        variants={itemVariants}
-        className="grid grid-cols-1 md:grid-cols-3 gap-5"
-      >
+      {/* 4. Secondary Breakdown Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* Top Rented Gear */}
-        <div className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
+        <div className="rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] p-5 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[var(--admin-border)]">
             <div className="flex items-center gap-2">
-              <Award className="h-4 w-4 text-[#FF7655]" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424] dark:text-[#F8FAFC]">
-                Top Rented Gear
+              <Award className="h-4 w-4 text-[var(--admin-text-muted)]" strokeWidth={1.5} />
+              <h3 className="text-sm font-semibold text-[var(--admin-text)]">
+                Top rented gear
               </h3>
             </div>
-            <span className="text-[10px] text-[#77757D] dark:text-[#9AAAC2] font-mono">By Volume</span>
+            <span className="text-xs font-mono text-[var(--admin-text-muted)]">Volume</span>
           </div>
 
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             {topRentedGear.length > 0 ? (
               topRentedGear.map((p) => (
                 <div
                   key={p.id}
-                  className="flex items-center justify-between p-2 rounded-xl hover:bg-[#F8F7F9] dark:hover:bg-[#162238]/60 transition-colors duration-150"
+                  className="flex items-center justify-between p-2 rounded-lg hover:bg-[var(--admin-elevated)]/60 transition-colors"
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="h-8 w-8 rounded-lg bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-center shrink-0">
-                      <Package className="h-4 w-4 text-[#77757D] dark:text-[#9AAAC2]" />
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-8 w-8 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] flex items-center justify-center shrink-0">
+                      <Package className="h-4 w-4 text-[var(--admin-text-muted)]" strokeWidth={1.5} />
                     </div>
                     <div className="min-w-0">
-                      <div className="text-xs font-semibold text-[#242424] dark:text-[#F8FAFC] truncate">
+                      <div className="text-xs font-medium text-[var(--admin-text)] truncate">
                         {p.title}
                       </div>
-                      <div className="text-[10px] text-[#77757D] dark:text-[#9AAAC2] truncate">
-                        {p.category || "Gear"}
+                      <div className="text-xs text-[var(--admin-text-muted)] truncate">
+                        {p.category || "Equipment"}
                       </div>
                     </div>
                   </div>
-                  <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-lg bg-[#F8F7F9] dark:bg-[#1E1E1E] text-[#242424] dark:text-[#F8FAFC] border border-[#E6E4E9] dark:border-[#273244]">
-                    {p.rentalCount || 0} rentals
+                  <span className="text-xs font-mono font-medium px-2 py-0.5 rounded bg-[var(--admin-elevated)] text-[var(--admin-text)] border border-[var(--admin-border)] tabular-nums shrink-0 ml-2">
+                    {p.rentalCount || 0}
                   </span>
                 </div>
               ))
             ) : (
-              <div className="py-8 text-center text-xs text-[#77757D] dark:text-[#9AAAC2]">
-                No equipment rental records available.
+              <div className="py-8 text-center text-xs text-[var(--admin-text-muted)]">
+                No equipment rental records available
               </div>
             )}
           </div>
         </div>
 
         {/* Category Velocity */}
-        <div className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
+        <div className="rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] p-5 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[var(--admin-border)]">
             <div className="flex items-center gap-2">
-              <Layers className="h-4 w-4 text-[#FF7655]" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424] dark:text-[#F8FAFC]">
-                Category Velocity
+              <Layers className="h-4 w-4 text-[var(--admin-text-muted)]" strokeWidth={1.5} />
+              <h3 className="text-sm font-semibold text-[var(--admin-text)]">
+                Category share
               </h3>
             </div>
-            <Link to="/admin/categories" className="text-[11px] font-semibold text-[#FF7655] hover:underline">
-              View All
+            <Link
+              to="/admin/categories"
+              className="text-xs font-medium text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] hover:underline"
+            >
+              View all
             </Link>
           </div>
 
           <div className="space-y-3">
             {categoryVelocity.length > 0 ? (
-              categoryVelocity.map((cat) => (
-                <div key={cat.name} className="space-y-1">
+              categoryVelocity.map((cat, idx) => (
+                <div key={cat.name} className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-[#242424] dark:text-[#F8FAFC] font-medium truncate max-w-[150px]">
+                    <span className="text-[var(--admin-text)] font-medium truncate max-w-40">
                       {cat.name}
                     </span>
-                    <span className="text-[11px] font-mono font-bold text-[#77757D] dark:text-[#9AAAC2]">
-                      {cat.count} listings ({cat.percent}%)
+                    <span className="font-mono text-[var(--admin-text-secondary)] tabular-nums">
+                      {cat.count} ({cat.percent}%)
                     </span>
                   </div>
-                  <div className="w-full h-1.5 rounded-full bg-[#F8F7F9] dark:bg-[#1E1E1E] overflow-hidden border border-[#E6E4E9] dark:border-[#273244]">
+                  <div className="w-full h-1.5 rounded-full bg-[var(--admin-elevated)] overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-[#F9856A] to-[#FF7655]"
+                      className={cn(
+                        "h-full rounded-full",
+                        idx === 0 ? "bg-[var(--admin-success)]" : "bg-[var(--admin-text-muted)]"
+                      )}
                       style={{ width: `${Math.min(cat.percent, 100)}%` }}
                     />
                   </div>
                 </div>
               ))
             ) : (
-              <div className="py-8 text-center text-xs text-[#77757D] dark:text-[#9AAAC2]">
-                No category distribution telemetry.
+              <div className="py-8 text-center text-xs text-[var(--admin-text-muted)]">
+                No category data available
               </div>
             )}
           </div>
         </div>
 
-        {/* Platform Compliance & Health */}
-        <div className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
+        {/* Platform Safeguards */}
+        <div className="rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] p-5 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[var(--admin-border)]">
             <div className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-[#10B981]" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424] dark:text-[#F8FAFC]">
-                Platform Compliance
+              <ShieldCheck className="h-4 w-4 text-[var(--admin-text-muted)]" strokeWidth={1.5} />
+              <h3 className="text-sm font-semibold text-[var(--admin-text)]">
+                Platform safeguards
               </h3>
             </div>
-            <span className="px-2 py-0.5 rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 text-[10px] font-mono font-bold">
-              100% PASS
+            <span className="text-xs font-mono text-[var(--admin-success)]">
+              Enforced
             </span>
           </div>
 
           <div className="space-y-2 text-xs">
-            <div className="p-2.5 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
-              <span className="text-[#242424] dark:text-[#F8FAFC] font-medium">PIN Handshake Verification</span>
-              <span className="text-[#059669] dark:text-emerald-400 font-bold">Enforced</span>
+            <div className="p-3 rounded-lg bg-[var(--admin-elevated)]/60 border border-[var(--admin-border)] flex items-center justify-between">
+              <span className="text-[var(--admin-text)]">Dual-PIN handover check</span>
+              <span className="text-[var(--admin-success)] font-medium">Active</span>
             </div>
-            <div className="p-2.5 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
-              <span className="text-[#242424] dark:text-[#F8FAFC] font-medium">Razorpay Escrow Vault</span>
-              <span className="text-[#059669] dark:text-emerald-400 font-bold">Secured</span>
+            <div className="p-3 rounded-lg bg-[var(--admin-elevated)]/60 border border-[var(--admin-border)] flex items-center justify-between">
+              <span className="text-[var(--admin-text)]">Escrow settlement</span>
+              <span className="text-[var(--admin-text-secondary)] font-mono">Razorpay</span>
             </div>
-            <div className="p-2.5 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
-              <span className="text-[#242424] dark:text-[#F8FAFC] font-medium">Platform Uptime SLA</span>
-              <span className="text-[#242424] dark:text-[#F8FAFC] font-mono font-bold">99.98%</span>
+            <div className="p-3 rounded-lg bg-[var(--admin-elevated)]/60 border border-[var(--admin-border)] flex items-center justify-between">
+              <span className="text-[var(--admin-text)]">Fulfillment completion</span>
+              <span className="text-[var(--admin-text)] font-mono font-medium tabular-nums">
+                {deliveredRate}%
+              </span>
             </div>
           </div>
         </div>
-      </motion.div>
+      </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* 5. OPERATIONAL WORKSPACE: NEEDS ATTENTION (APPROVALS & EXCEPTIONS) */}
-      {/* ------------------------------------------------------------------ */}
+      {/* 5. Operational Workspace: Needs Attention */}
       <div id="operational-queue" className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h2 className="text-base font-bold text-[#242424] dark:text-[#F8FAFC]">
-              Needs Attention
+            <h2 className="text-base font-semibold text-[var(--admin-text)]">
+              Needs attention
             </h2>
-            <span className="px-2 py-0.5 rounded-full bg-[#FF7655]/10 text-[#FF7655] border border-[#FF7655]/20 text-[11px] font-mono font-bold">
-              {pendingApprovalsVal + openIssuesVal} Items
+            <span className="px-2 py-0.5 rounded-md bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-xs font-mono tabular-nums text-[var(--admin-text-secondary)]">
+              {pendingApprovalsVal + openIssuesVal} items
             </span>
           </div>
-          <span className="text-xs text-[#77757D] dark:text-[#9AAAC2]">
-            Requires immediate administrative review
+          <span className="text-xs text-[var(--admin-text-muted)] hidden sm:inline">
+            Pending listings, KYC reviews, and open disputes
           </span>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {/* PENDING APPROVALS LIST */}
-          <div className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
+          {/* Pending Approvals */}
+          <div className="rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] p-5 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--admin-border)]">
               <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-[#D97706] dark:text-amber-400" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424] dark:text-[#F8FAFC]">
-                  Pending Approvals
+                <Clock className="h-4 w-4 text-[var(--admin-text-muted)]" strokeWidth={1.5} />
+                <h3 className="text-sm font-semibold text-[var(--admin-text)]">
+                  Pending approvals
                 </h3>
               </div>
-              <Link to="/admin/products" className="text-xs font-semibold text-[#FF7655] hover:underline">
-                Manage Queue →
+              <Link
+                to="/admin/products"
+                className="text-xs font-medium text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] hover:underline"
+              >
+                Manage queue
               </Link>
             </div>
 
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               {pendingProductsList.length > 0 || pendingUsersList.length > 0 ? (
                 <>
-                  {/* Pending Products */}
                   {pendingProductsList.slice(0, 3).map((prod) => (
                     <div
                       key={prod.id}
-                      className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 hover:border-[#D6D4D9] dark:hover:border-[#3B82F6]/40 transition-all"
+                      className="p-3 rounded-lg bg-[var(--admin-elevated)]/50 border border-[var(--admin-border)] flex items-center justify-between gap-3"
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 font-bold">
-                            Gear Listing
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-[var(--admin-card)] border border-[var(--admin-border)] text-[var(--admin-warning)] shrink-0">
+                            Gear
                           </span>
-                          <span className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC] truncate">
+                          <span className="text-xs font-medium text-[var(--admin-text)] truncate">
                             {prod.title}
                           </span>
                         </div>
-                        <div className="text-[11px] text-[#77757D] dark:text-[#9AAAC2] truncate mt-0.5">
-                          ₹{prod.dailyRate || 0}/day · Listed by {prod.ownerName || "Vendor"}
+                        <div className="text-xs text-[var(--admin-text-secondary)] truncate mt-1 tabular-nums">
+                          ₹{(prod.dailyRate ?? prod.price ?? 0).toLocaleString("en-IN")}/day ·{" "}
+                          {prod.ownerName || prod.owner?.name || "Vendor"}
                         </div>
                       </div>
 
@@ -1165,39 +1026,39 @@ export function Dashboard() {
                         <button
                           onClick={() => handleApproveProduct(prod.id, prod.title)}
                           disabled={approvingId === prod.id}
-                          className="px-2.5 py-1 text-xs font-bold rounded-lg bg-[#242424] text-white hover:bg-black dark:bg-[#3B82F6] dark:hover:bg-[#2563EB] transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                          className="px-3 h-7 text-xs font-medium rounded-md bg-[var(--admin-text)] text-[var(--admin-bg)] hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
                         >
-                          {approvingId === prod.id ? "Approving..." : "Approve"}
+                          {approvingId === prod.id ? "Approving" : "Approve"}
                         </button>
                         <button
                           onClick={() => handleRejectProduct(prod.id, prod.title)}
                           disabled={rejectingId === prod.id}
-                          className="p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 transition-colors cursor-pointer"
+                          className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-destructive/10 text-[var(--admin-error)] transition-colors cursor-pointer"
                           title="Reject listing"
+                          aria-label="Reject listing"
                         >
-                          <X className="h-4 w-4" />
+                          <X className="h-4 w-4" strokeWidth={1.5} />
                         </button>
                       </div>
                     </div>
                   ))}
 
-                  {/* Pending Users */}
                   {pendingUsersList.slice(0, 2).map((u) => (
                     <div
                       key={u.id}
-                      className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 hover:border-[#D6D4D9] dark:hover:border-[#3B82F6]/40 transition-all"
+                      className="p-3 rounded-lg bg-[var(--admin-elevated)]/50 border border-[var(--admin-border)] flex items-center justify-between gap-3"
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 font-bold">
-                            KYC User
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-[var(--admin-card)] border border-[var(--admin-border)] text-[var(--admin-text-secondary)] shrink-0">
+                            KYC
                           </span>
-                          <span className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC] truncate">
+                          <span className="text-xs font-medium text-[var(--admin-text)] truncate">
                             {u.fullName || u.email}
                           </span>
                         </div>
-                        <div className="text-[11px] text-[#77757D] dark:text-[#9AAAC2] truncate mt-0.5">
-                          Role: {u.role} · {u.email}
+                        <div className="text-xs text-[var(--admin-text-secondary)] truncate mt-1">
+                          {u.role} · {u.email}
                         </div>
                       </div>
 
@@ -1205,77 +1066,80 @@ export function Dashboard() {
                         <button
                           onClick={() => handleApproveUser(u.id, u.fullName || u.email)}
                           disabled={approvingUserId === u.id}
-                          className="px-2.5 py-1 text-xs font-bold rounded-lg bg-[#242424] text-white hover:bg-black dark:bg-[#3B82F6] dark:hover:bg-[#2563EB] transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                          className="px-3 h-7 text-xs font-medium rounded-md bg-[var(--admin-text)] text-[var(--admin-bg)] hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
                         >
-                          {approvingUserId === u.id ? "Approving..." : "Approve"}
+                          {approvingUserId === u.id ? "Approving" : "Approve"}
                         </button>
                       </div>
                     </div>
                   ))}
                 </>
               ) : (
-                <div className="py-10 text-center bg-[#F8F7F9] dark:bg-[#1E1E1E]/50 rounded-xl border border-dashed border-[#E6E4E9] dark:border-[#273244] text-xs text-[#77757D] dark:text-[#9AAAC2]">
-                  <CheckCircle2 className="h-6 w-6 text-[#10B981] mx-auto mb-2" />
-                  <span>All submissions verified. Zero queue backlog.</span>
+                <div className="py-10 text-center bg-[var(--admin-elevated)]/30 rounded-lg border border-dashed border-[var(--admin-border)] text-xs text-[var(--admin-text-muted)]">
+                  <CheckCircle2 className="h-5 w-5 text-[var(--admin-success)] mx-auto mb-2" strokeWidth={1.5} />
+                  <span>All submissions reviewed</span>
                 </div>
               )}
             </div>
           </div>
 
-          {/* ISSUES & EXCEPTIONS LIST */}
-          <div className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
+          {/* Issues & Exceptions */}
+          <div className="rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] p-5 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--admin-border)]">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-[#DC2626]" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424] dark:text-[#F8FAFC]">
-                  Issues & Exceptions
+                <AlertTriangle className="h-4 w-4 text-[var(--admin-text-muted)]" strokeWidth={1.5} />
+                <h3 className="text-sm font-semibold text-[var(--admin-text)]">
+                  Issues & exceptions
                 </h3>
               </div>
-              <Link to="/admin/reports" className="text-xs font-semibold text-[#FF7655] hover:underline">
-                View All →
+              <Link
+                to="/admin/reports"
+                className="text-xs font-medium text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] hover:underline"
+              >
+                View all
               </Link>
             </div>
 
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               {issuesList.length > 0 ? (
                 issuesList.map((issue) => (
                   <div
                     key={issue.id}
-                    className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 hover:border-[#D6D4D9] dark:hover:border-[#3B82F6]/40 transition-all"
+                    className="p-3 rounded-lg bg-[var(--admin-elevated)]/50 border border-[var(--admin-border)] flex items-center justify-between gap-3"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span
                           className={cn(
-                            "text-[9px] font-mono uppercase px-1.5 py-0.5 rounded font-bold",
-                            issue.severity === "CRITICAL"
-                              ? "bg-red-100 dark:bg-red-500/20 text-red-800 dark:text-red-300"
-                              : "bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300"
+                            "text-[11px] font-mono px-1.5 py-0.5 rounded border shrink-0",
+                            issue.severity === "Critical"
+                              ? "bg-destructive/10 text-[var(--admin-error)] border-destructive/20"
+                              : "bg-[var(--admin-card)] text-[var(--admin-warning)] border-[var(--admin-border)]"
                           )}
                         >
                           {issue.severity}
                         </span>
-                        <span className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC] truncate">
+                        <span className="text-xs font-medium text-[var(--admin-text)] truncate">
                           {issue.title}
                         </span>
                       </div>
-                      <div className="text-[11px] text-[#77757D] dark:text-[#9AAAC2] truncate mt-0.5">
-                        Logged by {issue.author} · {issue.date}
+                      <div className="text-xs text-[var(--admin-text-secondary)] truncate mt-1">
+                        {issue.author} · {issue.date}
                       </div>
                     </div>
 
                     <Link
                       to={issue.type === "report" ? "/admin/reports" : "/admin/support"}
-                      className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] text-[#242424] dark:text-[#F8FAFC] hover:bg-[#F8F7F9] dark:hover:bg-[#162238] transition-colors shrink-0 shadow-2xs"
+                      className="px-3 h-7 inline-flex items-center text-xs font-medium rounded-md bg-[var(--admin-card)] border border-[var(--admin-border)] text-[var(--admin-text)] hover:bg-[var(--admin-elevated)] transition-colors shrink-0"
                     >
                       Resolve
                     </Link>
                   </div>
                 ))
               ) : (
-                <div className="py-10 text-center bg-[#F8F7F9] dark:bg-[#1E1E1E]/50 rounded-xl border border-dashed border-[#E6E4E9] dark:border-[#273244] text-xs text-[#77757D] dark:text-[#9AAAC2]">
-                  <CheckCircle2 className="h-6 w-6 text-[#10B981] mx-auto mb-2" />
-                  <span>Zero open disputes or reported issues. Platform operational.</span>
+                <div className="py-10 text-center bg-[var(--admin-elevated)]/30 rounded-lg border border-dashed border-[var(--admin-border)] text-xs text-[var(--admin-text-muted)]">
+                  <CheckCircle2 className="h-5 w-5 text-[var(--admin-success)] mx-auto mb-2" strokeWidth={1.5} />
+                  <span>No open reports or support disputes</span>
                 </div>
               )}
             </div>
@@ -1283,48 +1147,47 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* 6. UPCOMING BOOKINGS & OVERDUE ACTIONS */}
-      {/* ------------------------------------------------------------------ */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* UPCOMING BOOKINGS */}
-        <div className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
+      {/* 6. Upcoming Bookings & Action Tasks */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] p-5 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[var(--admin-border)]">
             <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-[#FF7655]" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424] dark:text-[#F8FAFC]">
-                Upcoming Bookings
+              <Calendar className="h-4 w-4 text-[var(--admin-text-muted)]" strokeWidth={1.5} />
+              <h3 className="text-sm font-semibold text-[var(--admin-text)]">
+                Upcoming bookings
               </h3>
             </div>
-            <Link to="/admin/bookings" className="text-xs font-semibold text-[#FF7655] hover:underline">
-              View Roster →
+            <Link
+              to="/admin/bookings"
+              className="text-xs font-medium text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] hover:underline"
+            >
+              View roster
             </Link>
           </div>
 
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             {upcomingBookingsList.length > 0 ? (
               upcomingBookingsList.map((bk) => (
                 <div
                   key={bk.id}
-                  className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 hover:border-[#D6D4D9] dark:hover:border-[#3B82F6]/40 transition-all"
+                  className="p-3 rounded-lg bg-[var(--admin-elevated)]/50 border border-[var(--admin-border)] flex items-center justify-between gap-3"
                 >
                   <div className="min-w-0">
-                    <div className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC] truncate">
+                    <div className="text-xs font-medium text-[var(--admin-text)] truncate">
                       {bk.productTitle || `Booking #${bk.id.slice(0, 8)}`}
                     </div>
-                    <div className="text-[11px] text-[#77757D] dark:text-[#9AAAC2] truncate mt-0.5">
-                      Renter: {bk.renterName || "Customer"} · ₹{bk.totalAmount || 0}
+                    <div className="text-xs text-[var(--admin-text-secondary)] truncate mt-1 tabular-nums">
+                      {bk.renterName || bk.customerName || "Customer"} · ₹
+                      {(bk.totalAmount ?? bk.amount ?? 0).toLocaleString("en-IN")}
                     </div>
                   </div>
 
                   <span
                     className={cn(
-                      "px-2 py-0.5 text-[10px] font-mono font-bold rounded-full capitalize",
+                      "px-2 py-0.5 text-[11px] font-mono rounded-md capitalize border shrink-0",
                       bk.status === "active"
-                        ? "bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20"
-                        : bk.status === "confirmed"
-                        ? "bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-500/30"
-                        : "bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30"
+                        ? "bg-[var(--admin-success)]/10 text-[var(--admin-success)] border-[var(--admin-success)]/20"
+                        : "bg-[var(--admin-card)] text-[var(--admin-text-secondary)] border-[var(--admin-border)]"
                     )}
                   >
                     {bk.status}
@@ -1332,49 +1195,48 @@ export function Dashboard() {
                 </div>
               ))
             ) : (
-              <div className="py-8 text-center text-xs text-[#77757D] dark:text-[#9AAAC2]">
-                No scheduled reservations currently active.
+              <div className="py-8 text-center text-xs text-[var(--admin-text-muted)]">
+                No scheduled reservations active
               </div>
             )}
           </div>
         </div>
 
-        {/* OVERDUE ACTIONS */}
-        <div className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
+        <div className="rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] p-5 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[var(--admin-border)]">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-[#D97706] dark:text-amber-400" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424] dark:text-[#F8FAFC]">
-                Action Required Tasks
+              <AlertTriangle className="h-4 w-4 text-[var(--admin-text-muted)]" strokeWidth={1.5} />
+              <h3 className="text-sm font-semibold text-[var(--admin-text)]">
+                Action required
               </h3>
             </div>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#F8F7F9] dark:bg-[#1E1E1E] text-[#77757D] dark:text-[#9AAAC2] border border-[#E6E4E9] dark:border-[#273244]">
-              {overdueActions.length} Tasks
+            <span className="text-xs font-mono tabular-nums text-[var(--admin-text-muted)]">
+              {overdueActions.length} tasks
             </span>
           </div>
 
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             {overdueActions.length > 0 ? (
               overdueActions.map((task) => (
                 <div
                   key={task.id}
-                  className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 hover:border-[#D6D4D9] dark:hover:border-[#3B82F6]/40 transition-all"
+                  className="p-3 rounded-lg bg-[var(--admin-elevated)]/50 border border-[var(--admin-border)] flex items-center justify-between gap-3"
                 >
                   <div className="min-w-0">
-                    <div className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC] truncate">
+                    <div className="text-xs font-medium text-[var(--admin-text)] truncate">
                       {task.title}
                     </div>
-                    <div className="text-[11px] text-[#77757D] dark:text-[#9AAAC2] truncate mt-0.5">
+                    <div className="text-xs text-[var(--admin-text-secondary)] truncate mt-1">
                       {task.category}
                     </div>
                   </div>
 
                   <span
                     className={cn(
-                      "px-2 py-0.5 text-[10px] font-mono font-bold rounded-full shrink-0",
+                      "px-2 py-0.5 text-[11px] font-mono rounded-md shrink-0 border",
                       task.urgent
-                        ? "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-500/30"
-                        : "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30"
+                        ? "bg-destructive/10 text-[var(--admin-error)] border-destructive/20"
+                        : "bg-[var(--admin-card)] text-[var(--admin-warning)] border-[var(--admin-border)]"
                     )}
                   >
                     {task.duration}
@@ -1382,112 +1244,112 @@ export function Dashboard() {
                 </div>
               ))
             ) : (
-              <div className="py-8 text-center text-xs text-[#77757D] dark:text-[#9AAAC2]">
-                All operational items are current. Zero overdue tasks.
+              <div className="py-8 text-center text-xs text-[var(--admin-text-muted)]">
+                No pending action items
               </div>
             )}
           </div>
         </div>
-      </motion.div>
+      </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* 7. AUDIT TRAIL & PLATFORM HEALTH */}
-      {/* ------------------------------------------------------------------ */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* RECENT ACTIVITY TRAIL (2 COLS) */}
-        <div className="lg:col-span-2 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
+      {/* 7. Audit Trail & Platform Health */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="lg:col-span-2 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] p-5 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[var(--admin-border)]">
             <div className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-[#FF7655]" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424] dark:text-[#F8FAFC]">
-                Recent Activity Trail
+              <Activity className="h-4 w-4 text-[var(--admin-text-muted)]" strokeWidth={1.5} />
+              <h3 className="text-sm font-semibold text-[var(--admin-text)]">
+                Recent activity trail
               </h3>
             </div>
-            <Link to="/admin/activity-logs" className="text-xs font-semibold text-[#FF7655] hover:underline">
-              Full Audit Logs →
+            <Link
+              to="/admin/activity-logs"
+              className="text-xs font-medium text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] hover:underline"
+            >
+              Audit logs
             </Link>
           </div>
 
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             {recentActivity.length > 0 ? (
               recentActivity.slice(0, 5).map((act) => (
                 <div
                   key={act.id}
-                  className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 text-xs"
+                  className="p-3 rounded-lg bg-[var(--admin-elevated)]/50 border border-[var(--admin-border)] flex items-center justify-between gap-3 text-xs"
                 >
                   <div className="min-w-0">
-                    <span className="font-semibold text-[#242424] dark:text-[#F8FAFC]">{act.action}</span>
-                    <div className="text-[11px] text-[#77757D] dark:text-[#9AAAC2] truncate mt-0.5">
-                      Target: {act.target || "Platform"} · By {act.user || "System"}
+                    <span className="font-medium text-[var(--admin-text)]">{act.action}</span>
+                    <div className="text-xs text-[var(--admin-text-secondary)] truncate mt-0.5">
+                      {act.target || "Platform"} · {act.user || "System"}
                     </div>
                   </div>
-                  <span className="text-[10px] font-mono text-[#77757D] dark:text-[#9AAAC2] shrink-0">
-                    {act.timestamp ? new Date(act.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Just now"}
+                  <span className="text-xs font-mono tabular-nums text-[var(--admin-text-muted)] shrink-0">
+                    {act.timestamp
+                      ? new Date(act.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                      : "Recent"}
                   </span>
                 </div>
               ))
             ) : (
-              <div className="py-8 text-center text-xs text-[#77757D] dark:text-[#9AAAC2]">
-                No recent activity records recorded in audit log.
+              <div className="py-8 text-center text-xs text-[var(--admin-text-muted)]">
+                No recent audit activity recorded
               </div>
             )}
           </div>
         </div>
 
-        {/* PLATFORM HEALTH (1 COL) */}
-        <div className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
+        <div className="rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] p-5 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[var(--admin-border)]">
             <div className="flex items-center gap-2">
-              <Database className="h-4 w-4 text-[#10B981]" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424] dark:text-[#F8FAFC]">
-                Platform Health
+              <Database className="h-4 w-4 text-[var(--admin-text-muted)]" strokeWidth={1.5} />
+              <h3 className="text-sm font-semibold text-[var(--admin-text)]">
+                System health
               </h3>
             </div>
-            <span className="px-2 py-0.5 rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 text-[10px] font-mono font-bold">
+            <span className="text-xs font-mono text-[var(--admin-success)]">
               Operational
             </span>
           </div>
 
-          <div className="space-y-3">
-            <div className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
+          <div className="space-y-2.5">
+            <div className="p-3 rounded-lg bg-[var(--admin-elevated)]/50 border border-[var(--admin-border)] flex items-center justify-between">
               <div>
-                <div className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC]">FastAPI Backend</div>
-                <div className="text-[10px] font-mono text-[#77757D] dark:text-[#9AAAC2]">/api/health/ready</div>
+                <div className="text-xs font-medium text-[var(--admin-text)]">FastAPI service</div>
+                <div className="text-[11px] font-mono text-[var(--admin-text-muted)]">/api/health/ready</div>
               </div>
-              <span className="h-2 w-2 rounded-full bg-[#10B981] animate-pulse" />
+              <span className="h-2 w-2 rounded-full bg-[var(--admin-success)]" />
             </div>
 
-            <div className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
+            <div className="p-3 rounded-lg bg-[var(--admin-elevated)]/50 border border-[var(--admin-border)] flex items-center justify-between">
               <div>
-                <div className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC]">Database Datastore</div>
-                <div className="text-[10px] font-mono text-[#77757D] dark:text-[#9AAAC2]">TiDB cloud MySQL SSL</div>
+                <div className="text-xs font-medium text-[var(--admin-text)]">MySQL datastore</div>
+                <div className="text-[11px] font-mono text-[var(--admin-text-muted)]">TiDB Cloud SSL</div>
               </div>
-              <span className="h-2 w-2 rounded-full bg-[#10B981]" />
+              <span className="h-2 w-2 rounded-full bg-[var(--admin-success)]" />
             </div>
 
-            <div className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
+            <div className="p-3 rounded-lg bg-[var(--admin-elevated)]/50 border border-[var(--admin-border)] flex items-center justify-between">
               <div>
-                <div className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC]">Live WebSocket Stream</div>
-                <div className="text-[10px] font-mono text-[#77757D] dark:text-[#9AAAC2]">/api/admin/ws</div>
+                <div className="text-xs font-medium text-[var(--admin-text)]">WebSocket stream</div>
+                <div className="text-[11px] font-mono text-[var(--admin-text-muted)]">/api/admin/ws</div>
               </div>
               <span
                 className={cn(
                   "h-2 w-2 rounded-full",
                   wsStatus === "LIVE" || wsStatus === "ONLINE" || wsStatus === "POLLING" || healthStatus === "ok"
-                    ? "bg-[#10B981] animate-pulse"
-                    : "bg-[#F59E0B]"
+                    ? "bg-[var(--admin-success)]"
+                    : "bg-[var(--admin-warning)]"
                 )}
-                title={wsStatus === "LIVE" ? "Live WebSocket Stream Operational" : "Real-time Telemetry Stream Active"}
               />
             </div>
           </div>
 
-          <div className="pt-2 border-t border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between text-[11px] text-[#77757D] dark:text-[#9AAAC2]">
-            <span>Data Freshness</span>
-            <span className="font-mono font-semibold text-[#242424] dark:text-[#F8FAFC]">Realtime sync</span>
+          <div className="pt-3 border-t border-[var(--admin-border)] flex items-center justify-between text-xs text-[var(--admin-text-muted)]">
+            <span>Sync interval</span>
+            <span className="font-mono text-[var(--admin-text)]">Realtime</span>
           </div>
         </div>
-      </motion.div>
+      </div>
     </motion.div>
   );
 }

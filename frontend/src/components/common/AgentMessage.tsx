@@ -187,7 +187,7 @@ export function AgentMessage({
     >
       <div className="flex items-start gap-2.5 max-w-[92%] sm:max-w-[85%]">
         {/* Assistant Avatar */}
-        <div className="shrink-0 mt-0.5">
+        <div className="shrink-0 mt-0.5 text-neutral-800 dark:text-neutral-200">
           <PayentAgentIcon size={26} />
         </div>
 

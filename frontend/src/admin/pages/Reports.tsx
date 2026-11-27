@@ -36,10 +36,29 @@ import { paymentsService } from "../services/payments";
 import { AdminReport } from "../services/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/hooks/useTheme";
+import { ConfirmDialog } from "../components/layout/ConfirmDialog";
 
 type ReportType = "revenue" | "bookings" | "users" | "products" | "payments" | "agents" | "reviews";
 
 export default function Reports() {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const accentHex = isDark ? "#4CC38A" : "#047857";
+  const mutedHex = isDark ? "#85858B" : "#737373";
+  const tooltipStyle = {
+    backgroundColor: isDark ? "#232325" : "#FFFFFF",
+    borderColor: isDark ? "rgba(237,237,237,0.12)" : "rgba(23,23,23,0.12)",
+    borderRadius: "8px",
+    color: isDark ? "#EDEDED" : "#171717",
+    fontSize: "12px",
+  };
+  const currentMonthLabel = useMemo(
+    () => new Intl.DateTimeFormat("en-IN", { month: "short", year: "numeric" }).format(new Date()),
+    []
+  );
+  const [confirmDisputeAction, setConfirmDisputeAction] = useState<{ type: "product" | "user"; id: string } | null>(null);
+  const [disputeActionLoading, setDisputeActionLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"generator" | "disputes">("generator");
 
   // Dispute reports state
@@ -114,35 +133,43 @@ export default function Reports() {
     }
   };
 
-  const handleSuspendProduct = async (id: string) => {
-    if (!confirm("Are you sure you want to suspend this reported product?")) return;
-    try {
-      const updated = await notificationsService.suspendProductReport(id);
-      setReports((prev) => prev.map((r) => (r.id === id ? updated : r)));
-      toast.success("Product listing suspended.");
-    } catch {
-      toast.error("Failed to suspend product.");
-    }
+  const handleSuspendProduct = (id: string) => {
+    setConfirmDisputeAction({ type: "product", id });
   };
 
-  const handleBanUser = async (id: string) => {
-    if (!confirm("Are you sure you want to suspend the reported user account?")) return;
+  const handleBanUser = (id: string) => {
+    setConfirmDisputeAction({ type: "user", id });
+  };
+
+  const executeDisputeAction = async () => {
+    if (!confirmDisputeAction) return;
     try {
-      const updated = await notificationsService.banUserReport(id);
-      setReports((prev) => prev.map((r) => (r.id === id ? updated : r)));
-      toast.success("User account suspended.");
+      setDisputeActionLoading(true);
+      if (confirmDisputeAction.type === "product") {
+        const updated = await notificationsService.suspendProductReport(confirmDisputeAction.id);
+        setReports((prev) => prev.map((r) => (r.id === confirmDisputeAction.id ? updated : r)));
+        toast.success("Product listing suspended.");
+      } else {
+        const updated = await notificationsService.banUserReport(confirmDisputeAction.id);
+        setReports((prev) => prev.map((r) => (r.id === confirmDisputeAction.id ? updated : r)));
+        toast.success("User account suspended.");
+      }
+      setConfirmDisputeAction(null);
     } catch {
-      toast.error("Failed to suspend user.");
+      toast.error("Action failed. Please try again.");
+    } finally {
+      setDisputeActionLoading(false);
     }
   };
 
   // Generate real operational report from backend endpoints
-  const handleGenerateReport = async () => {
+  const handleGenerateReport = async (overrideType?: ReportType) => {
     try {
       setGenerating(true);
       setGeneratedData(null);
 
-      if (reportType === "revenue") {
+      const activeReportType = overrideType || reportType;
+      if (activeReportType === "revenue") {
         const stats = await notificationsService.getDashboardStats();
         const charts = await notificationsService.getDashboardCharts(dateRange === "all" ? "365" : dateRange);
         const rows = (charts.revenueChart || []).map((r) => ({
@@ -152,7 +179,7 @@ export default function Reports() {
           "Today's Revenue (INR)": stats.revenueToday,
         }));
         setGeneratedData(rows);
-      } else if (reportType === "bookings") {
+      } else if (activeReportType === "bookings") {
         const bookings = await bookingsService.getBookings();
         const rows = bookings.map((b) => ({
           "Booking ID": b.id,
@@ -165,7 +192,7 @@ export default function Reports() {
           Date: b.createdAt ? new Date(b.createdAt).toLocaleDateString() : "—",
         }));
         setGeneratedData(rows);
-      } else if (reportType === "users") {
+      } else if (activeReportType === "users") {
         const users = await usersService.getUsers();
         const rows = users.map((u) => ({
           "User ID": u.id,
@@ -177,7 +204,7 @@ export default function Reports() {
           Joined: u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—",
         }));
         setGeneratedData(rows);
-      } else if (reportType === "products") {
+      } else if (activeReportType === "products") {
         const products = await productsService.getProducts();
         const rows = products.map((p) => ({
           "Product ID": p.id,
@@ -190,7 +217,7 @@ export default function Reports() {
           Created: p.createdAt ? new Date(p.createdAt).toLocaleDateString() : "—",
         }));
         setGeneratedData(rows);
-      } else if (reportType === "payments") {
+      } else if (activeReportType === "payments") {
         const payments = await paymentsService.getPayments();
         const rows = payments.map((py) => ({
           "Payment ID": py.id,
@@ -202,7 +229,7 @@ export default function Reports() {
           Date: py.createdAt ? new Date(py.createdAt).toLocaleString() : "—",
         }));
         setGeneratedData(rows);
-      } else if (reportType === "agents") {
+      } else if (activeReportType === "agents") {
         const agents = await usersService.getAgents();
         const rows = agents.map((a) => ({
           "Agent ID": a.id,
@@ -215,7 +242,7 @@ export default function Reports() {
           Status: a.status,
         }));
         setGeneratedData(rows);
-      } else if (reportType === "reviews") {
+      } else if (activeReportType === "reviews") {
         const reviews = await notificationsService.getReviews();
         const rows = reviews.map((rv) => ({
           "Review ID": rv.id,
@@ -288,8 +315,8 @@ export default function Reports() {
       label: "Reported Resource",
       render: (row) => (
         <div className="min-w-0">
-          <span className="font-bold text-foreground text-xs truncate block">{row.productTitle || `Item #${row.productId}`}</span>
-          <span className="text-[10px] text-muted-foreground font-mono truncate block">Owner: {row.ownerName}</span>
+          <span className="font-bold text-[var(--admin-text)] text-xs truncate block">{row.productTitle || `Item #${row.productId}`}</span>
+          <span className="text-[11px] text-[var(--admin-text-muted)] font-mono truncate block">Owner: {row.ownerName}</span>
         </div>
       ),
     },
@@ -297,21 +324,21 @@ export default function Reports() {
       key: "reason",
       label: "Violation Alleged",
       render: (row) => (
-        <span className="text-xs font-semibold text-foreground">{row.reason || "Disputed listing"}</span>
+        <span className="text-xs font-semibold text-[var(--admin-text)]">{row.reason || "Disputed listing"}</span>
       ),
     },
     {
       key: "evidence",
       label: "Dispute Detail / Evidence",
       render: (row) => (
-        <p className="text-xs text-muted-foreground line-clamp-2 max-w-sm leading-relaxed">{row.evidence || "—"}</p>
+        <p className="text-xs text-[var(--admin-text-muted)] line-clamp-2 max-w-sm leading-relaxed">{row.evidence || "—"}</p>
       ),
     },
     {
       key: "reporterName",
       label: "Reporter",
       render: (row) => (
-        <span className="text-xs text-muted-foreground">{row.reporterName || "Platform User"}</span>
+        <span className="text-xs text-[var(--admin-text-muted)]">{row.reporterName || "Platform User"}</span>
       ),
     },
     {
@@ -320,12 +347,12 @@ export default function Reports() {
       render: (row) => (
         <span
           className={cn(
-            "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border",
+            "px-2 py-0.5 rounded-full text-[11px] font-bold  border",
             row.status === "open"
               ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
               : row.status === "resolved"
               ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-              : "bg-secondary text-muted-foreground border-border/60"
+              : "bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] border-border/60"
           )}
         >
           {row.status}
@@ -341,35 +368,35 @@ export default function Reports() {
           <div className="flex items-center justify-end gap-1.5">
             <button
               onClick={() => handleResolve(row.id)}
-              className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all cursor-pointer"
+              className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors cursor-pointer"
               title="Mark as resolved"
             >
               <CheckCircle className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={() => handleSuspendProduct(row.id)}
-              className="p-1.5 rounded-lg bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 border border-amber-500/20 transition-all cursor-pointer"
+              className="p-1.5 rounded-lg bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 border border-amber-500/20 transition-colors cursor-pointer"
               title="Suspend reported listing"
             >
               <Package className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={() => handleBanUser(row.id)}
-              className="p-1.5 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 transition-all cursor-pointer"
+              className="p-1.5 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 transition-colors cursor-pointer"
               title="Suspend offender account"
             >
               <ShieldAlert className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={() => handleDismiss(row.id)}
-              className="p-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+              className="p-1.5 rounded-lg bg-[var(--admin-elevated)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] transition-colors cursor-pointer"
               title="Dismiss report"
             >
               <XCircle className="h-3.5 w-3.5" />
             </button>
           </div>
         ) : (
-          <span className="text-[11px] text-muted-foreground font-mono">Closed</span>
+          <span className="text-[11px] text-[var(--admin-text-muted)] font-mono">Closed</span>
         ),
     },
   ];
@@ -391,22 +418,22 @@ export default function Reports() {
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-border/50">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#F5F5F5]">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--admin-text)]">
             Reports
           </h1>
-          <p className="text-xs text-[#A1A1AA] mt-0.5 font-medium">
+          <p className="text-xs text-[var(--admin-text-muted)] mt-0.5 font-medium">
             Generate and view platform reports.
           </p>
         </div>
 
         {/* TABS SWITCH */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center p-0.5 bg-[#10151B] rounded-lg border border-[rgba(161,161,170,0.18)] text-xs font-medium">
+          <div className="flex items-center p-1 bg-[var(--admin-card)] rounded-lg border border-[var(--admin-border)] text-xs font-medium">
             <button
               onClick={() => setActiveTab("generator")}
               className={cn(
                 "px-3 py-1.5 rounded-md transition-colors cursor-pointer flex items-center gap-1.5 text-xs",
-                activeTab === "generator" ? "bg-white text-black font-semibold shadow-xs" : "text-[#A1A1AA] hover:text-[#F5F5F5]"
+                activeTab === "generator" ? "bg-[var(--admin-accent)] text-[var(--admin-bg)] font-semibold shadow-xs" : "text-[var(--admin-text-muted)] hover:text-[var(--admin-text)]"
               )}
             >
               <FileSpreadsheet className="h-3.5 w-3.5" />
@@ -416,7 +443,7 @@ export default function Reports() {
               onClick={() => setActiveTab("disputes")}
               className={cn(
                 "px-3 py-1.5 rounded-md transition-colors cursor-pointer flex items-center gap-1.5 text-xs",
-                activeTab === "disputes" ? "bg-white text-black font-semibold shadow-xs" : "text-[#A1A1AA] hover:text-[#F5F5F5]"
+                activeTab === "disputes" ? "bg-[var(--admin-accent)] text-[var(--admin-bg)] font-semibold shadow-xs" : "text-[var(--admin-text-muted)] hover:text-[var(--admin-text)]"
               )}
             >
               <Flag className="h-3.5 w-3.5" />
@@ -429,7 +456,7 @@ export default function Reports() {
       {activeTab === "generator" ? (
         <div className="space-y-6">
           {/* CATEGORY TABS (Panel 10): Revenue | Bookings | Users | Products */}
-          <div className="flex items-center gap-2 border-b border-[rgba(161,161,170,0.18)] pb-2 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-2 border-b border-[var(--admin-border)] pb-2 overflow-x-auto no-scrollbar">
             {[
               { id: "revenue", label: "Revenue" },
               { id: "bookings", label: "Bookings" },
@@ -440,10 +467,10 @@ export default function Reports() {
                 key={tab.id}
                 onClick={() => setReportType(tab.id as ReportType)}
                 className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer",
+                  "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap cursor-pointer",
                   reportType === tab.id
-                    ? "bg-white text-black font-semibold shadow-xs"
-                    : "text-[#A1A1AA] hover:text-[#F5F5F5] hover:bg-white/5 border border-transparent"
+                    ? "bg-[var(--admin-accent)] text-[var(--admin-bg)] font-semibold shadow-xs"
+                    : "text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-elevated)] border border-transparent"
                 )}
               >
                 {tab.label}
@@ -453,28 +480,28 @@ export default function Reports() {
 
           {/* 3 TOP KPI CARDS */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-4 rounded-xl bg-[#10151B] border border-[rgba(161,161,170,0.18)] space-y-1">
-              <span className="text-xs text-[#A1A1AA] font-medium">Total Revenue</span>
+            <div className="p-4 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] space-y-1">
+              <span className="text-xs text-[var(--admin-text-muted)] font-medium">Total Revenue</span>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold font-mono text-[#F5F5F5]">
+                <span className="text-2xl font-bold font-mono text-[var(--admin-text)]">
                   ₹{(stats?.monthlyRevenue ?? 0).toLocaleString("en-IN")}
                 </span>
               </div>
             </div>
 
-            <div className="p-4 rounded-xl bg-[#10151B] border border-[rgba(161,161,170,0.18)] space-y-1">
-              <span className="text-xs text-[#A1A1AA] font-medium">Total Bookings</span>
+            <div className="p-4 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] space-y-1">
+              <span className="text-xs text-[var(--admin-text-muted)] font-medium">Total Bookings</span>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold font-mono text-[#F5F5F5]">
+                <span className="text-2xl font-bold font-mono text-[var(--admin-text)]">
                   {(stats?.monthlyBookings ?? 0).toLocaleString()}
                 </span>
               </div>
             </div>
 
-            <div className="p-4 rounded-xl bg-[#10151B] border border-[rgba(161,161,170,0.18)] space-y-1">
-              <span className="text-xs text-[#A1A1AA] font-medium">Total Users</span>
+            <div className="p-4 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] space-y-1">
+              <span className="text-xs text-[var(--admin-text-muted)] font-medium">Total Users</span>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold font-mono text-[#F5F5F5]">
+                <span className="text-2xl font-bold font-mono text-[var(--admin-text)]">
                   {(stats?.totalUsers ?? 0).toLocaleString()}
                 </span>
               </div>
@@ -482,58 +509,53 @@ export default function Reports() {
           </div>
 
           {/* MONTHLY CHART */}
-          <div className="p-5 rounded-xl bg-[#10151B] border border-[rgba(161,161,170,0.18)] space-y-3">
+          <div className="p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-[#F5F5F5] uppercase tracking-wider">
+              <h3 className="text-xs font-bold text-[var(--admin-text)]">
                 Monthly Trend Analysis
               </h3>
-              <span className="text-[11px] font-mono text-[#A1A1AA]">Last 6 Months</span>
+              <span className="text-[11px] font-mono text-[var(--admin-text-muted)]">Last 6 Months</span>
             </div>
             <div className="h-48 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={monthlyReportData}>
-                  <XAxis dataKey="month" stroke="#A1A1AA" fontSize={11} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#A1A1AA" fontSize={11} tickLine={false} axisLine={false} />
+                  <XAxis dataKey="month" stroke={mutedHex} fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis stroke={mutedHex} fontSize={11} tickLine={false} axisLine={false} />
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#171C23",
-                      borderColor: "rgba(161,161,170,0.2)",
-                      borderRadius: "8px",
-                      color: "#F5F5F5",
-                      fontSize: "12px",
-                    }}
+                    contentStyle={tooltipStyle}
                   />
-                  <Bar dataKey="value" fill="#FFFFFF" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="value" fill={accentHex} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
 
           {/* RECENT REPORTS LIST (Panel 10) */}
-          <div className="p-5 rounded-xl bg-[#10151B] border border-[rgba(161,161,170,0.18)] space-y-4">
-            <h3 className="text-xs font-bold text-[#F5F5F5] uppercase tracking-wider">
+          <div className="p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] space-y-4">
+            <h3 className="text-xs font-bold text-[var(--admin-text)]">
               Recent Reports
             </h3>
-            <div className="divide-y divide-[rgba(161,161,170,0.1)]">
+            <div className="divide-y divide-[var(--admin-border)]">
               {[
-                { title: "Monthly Revenue Report (Oct 2026)", date: "Generated on Oct 12, 2026", type: "revenue" },
-                { title: "User Growth Report (Oct 2026)", date: "Generated on Oct 10, 2026", type: "users" },
-                { title: "Product Performance Report (Oct 2026)", date: "Generated on Oct 08, 2026", type: "products" },
-                { title: "Booking Operations Report (Oct 2026)", date: "Generated on Oct 05, 2026", type: "bookings" },
+                { title: `Revenue Summary (${currentMonthLabel})`, date: "Live ledger snapshot", type: "revenue" },
+                { title: `User Directory Report (${currentMonthLabel})`, date: "Live account breakdown", type: "users" },
+                { title: `Product Performance Report (${currentMonthLabel})`, date: "Live catalog metrics", type: "products" },
+                { title: `Booking Operations Report (${currentMonthLabel})`, date: "Live rental fulfillment log", type: "bookings" },
               ].map((item, idx) => (
                 <div key={idx} className="py-3 flex items-center justify-between">
                   <div>
-                    <div className="text-xs font-bold text-[#F5F5F5]">{item.title}</div>
-                    <div className="text-[10px] text-[#A1A1AA] font-mono mt-0.5">{item.date}</div>
+                    <div className="text-xs font-semibold text-[var(--admin-text)]">{item.title}</div>
+                    <div className="text-[11px] text-[var(--admin-text-muted)] font-mono mt-0.5">{item.date}</div>
                   </div>
                   <button
                     onClick={() => {
-                      setReportType(item.type as ReportType);
-                      handleGenerateReport();
+                      const nextType = item.type as ReportType;
+                      setReportType(nextType);
+                      handleGenerateReport(nextType);
                     }}
-                    className="px-3 py-1.5 rounded-lg bg-[#171C23] hover:bg-white/10 text-[#F5F5F5] text-xs font-medium border border-[rgba(161,161,170,0.18)] flex items-center gap-1.5 cursor-pointer transition-colors"
+                    className="px-3 py-1.5 rounded-lg bg-[var(--admin-elevated)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs font-medium border border-[var(--admin-border)] flex items-center gap-1.5 cursor-pointer transition-colors"
                   >
-                    <Download className="h-3.5 w-3.5 text-[#A1A1AA]" />
+                    <Download className="h-3.5 w-3.5 text-[var(--admin-text-muted)]" />
                     <span>Download</span>
                   </button>
                 </div>
@@ -542,17 +564,17 @@ export default function Reports() {
           </div>
 
           {/* REPORT GENERATOR CONTROLS */}
-          <div className="p-5 bg-[#10151B] rounded-xl border border-[rgba(161,161,170,0.18)] space-y-4">
-            <h3 className="text-xs font-bold text-[#F5F5F5] uppercase tracking-wider">
+          <div className="p-5 bg-[var(--admin-card)] rounded-xl border border-[var(--admin-border)] space-y-4">
+            <h3 className="text-xs font-bold text-[var(--admin-text)]">
               Live Database Export
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-[#F5F5F5]">Report Scope</label>
+                <label className="text-xs font-medium text-[var(--admin-text)]">Report Scope</label>
                 <select
                   value={reportType}
                   onChange={(e) => setReportType(e.target.value as ReportType)}
-                  className="w-full bg-[#050709] text-[#F5F5F5] text-xs rounded-lg px-3 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none font-medium cursor-pointer"
+                  className="w-full bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-lg px-3 py-2 border border-[var(--admin-border)] focus:outline-none font-medium cursor-pointer"
                 >
                   <option value="revenue">Revenue Report</option>
                   <option value="bookings">Booking & Lease Report</option>
@@ -565,11 +587,11 @@ export default function Reports() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-[#F5F5F5]">Date Range Window</label>
+                <label className="text-xs font-medium text-[var(--admin-text)]">Date Range Window</label>
                 <select
                   value={dateRange}
                   onChange={(e) => setDateRange(e.target.value as typeof dateRange)}
-                  className="w-full bg-[#050709] text-[#F5F5F5] text-xs rounded-lg px-3 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none font-medium cursor-pointer"
+                  className="w-full bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-lg px-3 py-2 border border-[var(--admin-border)] focus:outline-none font-medium cursor-pointer"
                 >
                   <option value="7">Last 7 Days</option>
                   <option value="30">Last 30 Days</option>
@@ -580,7 +602,7 @@ export default function Reports() {
 
               <div className="flex items-end gap-2">
                 <button
-                  onClick={handleGenerateReport}
+                  onClick={() => handleGenerateReport()}
                   disabled={generating}
                   className="flex-1 py-2 rounded-lg bg-white hover:bg-neutral-200 text-black font-semibold text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
                 >
@@ -591,7 +613,7 @@ export default function Reports() {
                 {generatedData && generatedData.length > 0 && (
                   <button
                     onClick={handleExportCSV}
-                    className="px-3 py-2 rounded-lg bg-[#171C23] hover:bg-white/10 border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] font-medium text-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                    className="px-3 py-2 rounded-lg bg-[var(--admin-elevated)] hover:bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] font-medium text-xs transition-colors cursor-pointer flex items-center gap-1.5"
                     title="Export CSV"
                   >
                     <Download className="h-3.5 w-3.5" />
@@ -604,25 +626,25 @@ export default function Reports() {
 
           {/* GENERATED DATA VIEW */}
           {generatedData && (
-            <div className="bg-card rounded-2xl border border-border/80 shadow-xs overflow-hidden">
-              <div className="p-4 border-b border-border/40 flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            <div className="bg-[var(--admin-card)] rounded-2xl border border-[var(--admin-border)] shadow-xs overflow-hidden">
+              <div className="p-4 border-b border-[var(--admin-border)] flex items-center justify-between">
+                <span className="text-xs font-bold text-[var(--admin-text-muted)]">
                   Compiled Records ({generatedData.length} rows)
                 </span>
-                <span className="text-[11px] font-mono text-muted-foreground">Live Database Extract</span>
+                <span className="text-[11px] font-mono text-[var(--admin-text-muted)]">Live Database Extract</span>
               </div>
 
               {generatedData.length === 0 ? (
-                <div className="py-12 text-center text-xs text-muted-foreground">
+                <div className="py-12 text-center text-xs text-[var(--admin-text-muted)]">
                   No records found for the selected operational scope.
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
-                      <tr className="border-b border-border/40 bg-secondary/30">
+                      <tr className="border-b border-[var(--admin-border)] bg-[var(--admin-elevated)]/30">
                         {Object.keys(generatedData[0]).map((k) => (
-                          <th key={k} className="py-3 px-4 font-bold text-muted-foreground uppercase text-[10px] tracking-wider">
+                          <th key={k} className="py-3 px-4 font-medium text-[var(--admin-text-muted)] text-[11px]">
                             {k}
                           </th>
                         ))}
@@ -630,9 +652,9 @@ export default function Reports() {
                     </thead>
                     <tbody className="divide-y divide-border/20">
                       {generatedData.slice(0, 15).map((row, idx) => (
-                        <tr key={idx} className="hover:bg-secondary/30 transition-colors">
+                        <tr key={idx} className="hover:bg-[var(--admin-elevated)]/30 transition-colors">
                           {Object.keys(row).map((k) => (
-                            <td key={k} className="py-2.5 px-4 font-medium text-foreground">
+                            <td key={k} className="py-2.5 px-4 font-medium text-[var(--admin-text)]">
                               {String(row[k])}
                             </td>
                           ))}
@@ -641,7 +663,7 @@ export default function Reports() {
                     </tbody>
                   </table>
                   {generatedData.length > 15 && (
-                    <div className="p-3 text-center text-[11px] text-muted-foreground bg-secondary/10 border-t border-border/30">
+                    <div className="p-3 text-center text-[11px] text-[var(--admin-text-muted)] bg-[var(--admin-elevated)]/10 border-t border-border/30">
                       Showing preview of 15 of {generatedData.length} records. Click 'Export CSV' for full dataset.
                     </div>
                   )}
@@ -655,36 +677,36 @@ export default function Reports() {
         <div className="space-y-6">
           <div className="flex items-center justify-between gap-3">
             <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--admin-text-muted)]" />
               <input
                 type="text"
-                placeholder="Search disputes by reason, resource, reporter..."
+                placeholder="Search disputes by reason, resource, or reporter"
                 value={disputeSearch}
                 onChange={(e) => {
                   setDisputeSearch(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full bg-card text-foreground text-xs rounded-xl pl-9 pr-4 py-2 border border-border/80 focus:outline-none focus:border-primary font-medium"
+                className="w-full bg-[var(--admin-card)] text-[var(--admin-text)] text-xs rounded-xl pl-9 pr-4 py-2 border border-[var(--admin-border)] focus:outline-none focus:border-primary font-medium"
               />
             </div>
           </div>
 
           {disputeError && !loadingDisputes ? (
-            <div className="bg-card rounded-2xl border border-destructive/30 p-12 text-center shadow-xs flex flex-col items-center justify-center">
+            <div className="bg-[var(--admin-card)] rounded-2xl border border-destructive/30 p-12 text-center shadow-xs flex flex-col items-center justify-center">
               <div className="w-12 h-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mb-3">
                 <ShieldAlert className="h-6 w-6" />
               </div>
-              <h3 className="text-base font-bold text-foreground font-display">Database Sync Failed</h3>
-              <p className="text-xs text-muted-foreground mt-1 max-w-sm">{disputeError}</p>
+              <h3 className="text-base font-bold text-[var(--admin-text)] font-display">Database Sync Failed</h3>
+              <p className="text-xs text-[var(--admin-text-muted)] mt-1 max-w-sm">{disputeError}</p>
               <button
                 onClick={fetchDisputes}
-                className="mt-4 px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold transition-all shadow-xs cursor-pointer"
+                className="mt-4 px-4 py-2 rounded-xl bg-[var(--admin-accent)] hover:bg-[var(--admin-accent-hover)] text-[var(--admin-bg)] text-xs font-bold transition-colors shadow-xs cursor-pointer"
               >
                 Retry Database Fetch
               </button>
             </div>
           ) : (
-            <div className="bg-card rounded-2xl border border-border/80 shadow-xs overflow-hidden">
+            <div className="bg-[var(--admin-card)] rounded-2xl border border-[var(--admin-border)] shadow-xs overflow-hidden">
               <Table
                 columns={disputeColumns}
                 data={paginatedDisputes}
@@ -694,7 +716,7 @@ export default function Reports() {
               />
 
               {filteredDisputes.length > itemsPerPage && (
-                <div className="p-4 border-t border-border/40">
+                <div className="p-4 border-t border-[var(--admin-border)]">
                   <Pagination
                     currentPage={currentPage}
                     onPageChange={setCurrentPage}
@@ -707,6 +729,20 @@ export default function Reports() {
           )}
         </div>
       )}
+      <ConfirmDialog
+        isOpen={!!confirmDisputeAction}
+        onClose={() => setConfirmDisputeAction(null)}
+        onConfirm={executeDisputeAction}
+        title={confirmDisputeAction?.type === "product" ? "Suspend reported product" : "Suspend reported user"}
+        description={
+          confirmDisputeAction?.type === "product"
+            ? "This suspends the reported gear listing from the marketplace."
+            : "This suspends the reported user account until reactivated."
+        }
+        confirmLabel={confirmDisputeAction?.type === "product" ? "Suspend product" : "Suspend user"}
+        destructive
+        loading={disputeActionLoading}
+      />
     </div>
   );
 }

@@ -16,6 +16,7 @@ import { AdminReview } from "../services/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ProfilePhoto } from "@/components/common/ProfilePhoto";
+import { ConfirmDialog } from "../components/layout/ConfirmDialog";
 
 export default function Reviews() {
   const [reviews, setReviews] = useState<AdminReview[]>([]);
@@ -25,6 +26,9 @@ export default function Reviews() {
   // Filters
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [ratingFilter, setRatingFilter] = useState("all");
+  const [deleteReviewId, setDeleteReviewId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Sorting
   const [sortKey, setSortKey] = useState("createdAt");
@@ -71,14 +75,23 @@ export default function Reviews() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to permanently delete this customer review?")) return;
+  const handleDelete = (id: string) => {
+    setDeleteReviewId(id);
+  };
+
+  const executeDeleteReview = async () => {
+    if (!deleteReviewId) return;
+    const id = deleteReviewId;
     try {
+      setDeleting(true);
       await notificationsService.deleteReview(id);
       setReviews((prev) => prev.filter((r) => r.id !== id));
       toast.success("Review deleted permanently.");
+      setDeleteReviewId(null);
     } catch {
       toast.error("Failed to delete review.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -95,9 +108,17 @@ export default function Reviews() {
       );
     }
 
-    if (statusFilter !== "all") {
-      const isHidden = statusFilter === "hidden" || statusFilter === "flagged";
-      result = result.filter((r) => r.hidden === isHidden);
+    if (statusFilter === "published") {
+      result = result.filter((r) => !r.hidden && (r as any).status !== "pending");
+    } else if (statusFilter === "hidden" || statusFilter === "flagged") {
+      result = result.filter((r) => Boolean(r.hidden));
+    } else if (statusFilter === "pending") {
+      result = result.filter((r) => String((r as any).status || "").toLowerCase() === "pending");
+    }
+
+    if (ratingFilter !== "all") {
+      const targetRating = Number(ratingFilter);
+      result = result.filter((r) => Math.round(Number(r.rating || 0)) === targetRating);
     }
 
     result.sort((a, b) => {
@@ -114,7 +135,7 @@ export default function Reviews() {
     });
 
     return result;
-  }, [reviews, search, statusFilter, sortKey, sortOrder]);
+  }, [reviews, search, statusFilter, ratingFilter, sortKey, sortOrder]);
 
   const paginatedReviews = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
@@ -133,7 +154,7 @@ export default function Reviews() {
             size="sm"
             shape="circle"
           />
-          <span className="font-bold text-foreground text-xs truncate">{row.userName || "Verified Renter"}</span>
+          <span className="font-bold text-[var(--admin-text)] text-xs truncate">{row.userName || "Verified Renter"}</span>
         </div>
       ),
     },
@@ -141,7 +162,7 @@ export default function Reviews() {
       key: "productTitle",
       label: "Gear Item",
       render: (row) => (
-        <span className="font-semibold text-foreground text-xs truncate max-w-xs block">
+        <span className="font-semibold text-[var(--admin-text)] text-xs truncate max-w-xs block">
           {row.productTitle}
         </span>
       ),
@@ -161,7 +182,7 @@ export default function Reviews() {
       key: "comment",
       label: "Review Feedback",
       render: (row) => (
-        <p className="text-xs text-muted-foreground line-clamp-2 max-w-md leading-relaxed">
+        <p className="text-xs text-[var(--admin-text-muted)] line-clamp-2 max-w-md leading-relaxed">
           {row.comment}
         </p>
       ),
@@ -172,9 +193,9 @@ export default function Reviews() {
       render: (row) => (
         <span
           className={cn(
-            "px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider border",
+            "px-2 py-0.5 rounded text-[11px] font-medium  border",
             row.hidden
-              ? "bg-secondary text-muted-foreground border-border/70"
+              ? "bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] border-border/70"
               : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
           )}
         >
@@ -187,7 +208,7 @@ export default function Reviews() {
       label: "Date",
       sortable: true,
       render: (row) => (
-        <span className="text-xs text-muted-foreground font-mono">
+        <span className="text-xs text-[var(--admin-text-muted)] font-mono">
           {row.createdAt ? new Date(row.createdAt).toLocaleDateString() : "—"}
         </span>
       ),
@@ -200,14 +221,14 @@ export default function Reviews() {
         <div className="flex items-center justify-end gap-1.5">
           <button
             onClick={() => handleToggleHide(row.id)}
-            className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            className="p-1.5 rounded-md hover:bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] transition-colors cursor-pointer"
             title={row.hidden ? "Publish review" : "Hide review"}
           >
             {row.hidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
           </button>
           <button
             onClick={() => handleDelete(row.id)}
-            className="p-1.5 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-[#FF1744] transition-colors cursor-pointer"
+            className="p-1.5 rounded-md hover:bg-red-500/10 text-[var(--admin-text-muted)] hover:text-[var(--admin-error)] transition-colors cursor-pointer"
             title="Delete review"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -229,12 +250,12 @@ export default function Reviews() {
   return (
     <div className="space-y-6">
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-border/50">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-[var(--admin-border)]">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#F5F5F5]">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--admin-text)]">
             Reviews
           </h1>
-          <p className="text-xs text-[#A1A1AA] mt-0.5 font-medium">
+          <p className="text-xs text-[var(--admin-text-muted)] mt-0.5 font-medium">
             Manage user reviews and ratings.
           </p>
         </div>
@@ -242,15 +263,15 @@ export default function Reviews() {
         <button
           onClick={() => fetchReviews()}
           disabled={loading}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[rgba(161,161,170,0.18)] bg-[#10151B] hover:bg-[#171C23] text-[#F5F5F5] text-xs font-medium transition-colors cursor-pointer self-start sm:self-auto"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs font-medium transition-colors cursor-pointer self-start sm:self-auto"
         >
-          <RefreshCw className={cn("h-3.5 w-3.5 text-[#A1A1AA]", loading && "animate-spin")} />
+          <RefreshCw className={cn("h-3.5 w-3.5 text-[var(--admin-text-muted)]", loading && "animate-spin")} />
           <span>Refresh</span>
         </button>
       </div>
 
       {/* TABS WITH COUNTERS */}
-      <div className="flex items-center gap-2 border-b border-[rgba(161,161,170,0.18)] pb-2 overflow-x-auto no-scrollbar">
+      <div className="flex items-center gap-2 border-b border-[var(--admin-border)] pb-2 overflow-x-auto no-scrollbar">
         {[
           { id: "all", label: "All Reviews", count: tabCounts.all },
           { id: "pending", label: "Pending", count: tabCounts.pending },
@@ -264,19 +285,19 @@ export default function Reviews() {
               setCurrentPage(1);
             }}
             className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer flex items-center gap-2",
-              ((tab.id === "all" && statusFilter === "all") || (tab.id === "approved" && statusFilter === "published") || (tab.id === "rejected" && statusFilter === "hidden"))
-                ? "bg-white text-black font-semibold shadow-xs"
-                : "text-[#A1A1AA] hover:text-[#F5F5F5] hover:bg-white/5 border border-transparent"
+              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap cursor-pointer flex items-center gap-2",
+              ((tab.id === "all" && statusFilter === "all") || (tab.id === "pending" && statusFilter === "pending") || (tab.id === "approved" && statusFilter === "published") || (tab.id === "rejected" && statusFilter === "hidden"))
+                ? "bg-[var(--admin-accent)] text-[var(--admin-bg)] font-semibold shadow-xs"
+                : "text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-elevated)] border border-transparent"
             )}
           >
             <span>{tab.label}</span>
             <span
               className={cn(
-                "px-1.5 py-0.5 rounded-full text-[10px] font-mono",
-                ((tab.id === "all" && statusFilter === "all") || (tab.id === "approved" && statusFilter === "published") || (tab.id === "rejected" && statusFilter === "hidden"))
-                  ? "bg-black/15 text-black font-bold"
-                  : "bg-white/10 text-[#A1A1AA]"
+                "px-1.5 py-0.5 rounded-full text-[11px] font-mono",
+                ((tab.id === "all" && statusFilter === "all") || (tab.id === "pending" && statusFilter === "pending") || (tab.id === "approved" && statusFilter === "published") || (tab.id === "rejected" && statusFilter === "hidden"))
+                  ? "bg-white/20 dark:bg-black/15 text-[var(--admin-bg)] font-medium"
+                  : "bg-[var(--admin-elevated)] text-[var(--admin-text-muted)]"
               )}
             >
               {tab.count}
@@ -286,24 +307,29 @@ export default function Reviews() {
       </div>
 
       {/* FILTERS & SEARCH */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#10151B] p-3 rounded-xl border border-[rgba(161,161,170,0.18)]">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[var(--admin-card)] p-3 rounded-xl border border-[var(--admin-border)]">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#A1A1AA]" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--admin-text-muted)]" />
           <input
             type="text"
-            placeholder="Search reviews..."
+            placeholder="Search reviews"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full bg-[#050709] text-[#F5F5F5] text-xs rounded-lg pl-9 pr-3 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none focus:border-white/40 font-medium placeholder:text-[#A1A1AA]"
+            className="w-full bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-lg pl-9 pr-3 py-2 border border-[var(--admin-border)] focus:outline-none focus:border-[var(--admin-text)]/40 font-medium placeholder:text-[var(--admin-text-muted)]"
           />
         </div>
 
         <div className="flex items-center gap-2">
           <select
-            className="bg-[#050709] text-[#F5F5F5] text-xs rounded-lg px-2.5 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none font-medium cursor-pointer"
+            value={ratingFilter}
+            onChange={(e) => {
+              setRatingFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-lg px-2.5 py-2 border border-[var(--admin-border)] focus:outline-none font-medium cursor-pointer"
           >
             <option value="all">All Ratings</option>
             <option value="5">5 Stars</option>
@@ -319,7 +345,7 @@ export default function Reviews() {
               setStatusFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="bg-[#050709] text-[#F5F5F5] text-xs rounded-lg px-2.5 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none font-medium cursor-pointer"
+            className="bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-lg px-2.5 py-2 border border-[var(--admin-border)] focus:outline-none font-medium cursor-pointer"
           >
             <option value="all">All Status</option>
             <option value="published">Approved</option>
@@ -331,17 +357,17 @@ export default function Reviews() {
 
       {/* ERROR STATE */}
       {error && !loading ? (
-        <div className="bg-card rounded-xl border border-red-500/20 p-8 text-center flex flex-col items-center justify-center space-y-3">
-          <div className="w-10 h-10 rounded-full bg-red-500/10 text-[#FF1744] flex items-center justify-center">
+        <div className="bg-[var(--admin-card)] rounded-xl border border-red-500/20 p-8 text-center flex flex-col items-center justify-center space-y-3">
+          <div className="w-10 h-10 rounded-full bg-red-500/10 text-[var(--admin-error)] flex items-center justify-center">
             <ShieldAlert className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-foreground">Database Sync Failed</h3>
-            <p className="text-xs text-muted-foreground mt-1 max-w-sm">{error}</p>
+            <h3 className="text-sm font-semibold text-[var(--admin-text)]">Database Sync Failed</h3>
+            <p className="text-xs text-[var(--admin-text-muted)] mt-1 max-w-sm">{error}</p>
           </div>
           <button
             onClick={() => fetchReviews()}
-            className="px-4 py-2 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-xs font-medium transition-colors border border-border/80 cursor-pointer"
+            className="px-4 py-2 rounded-lg bg-[var(--admin-elevated)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs font-medium transition-colors border border-[var(--admin-border)] cursor-pointer"
           >
             Retry Database Fetch
           </button>
@@ -374,6 +400,16 @@ export default function Reviews() {
           )}
         </div>
       )}
+      <ConfirmDialog
+        isOpen={!!deleteReviewId}
+        onClose={() => setDeleteReviewId(null)}
+        onConfirm={executeDeleteReview}
+        title="Delete customer review"
+        description="This permanently deletes the selected customer review and cannot be undone."
+        confirmLabel="Delete review"
+        destructive
+        loading={deleting}
+      />
     </div>
   );
 }

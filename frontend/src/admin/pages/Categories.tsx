@@ -14,6 +14,7 @@ import { AdminCategory } from "../services/api";
 import { Table, Column } from "../components/layout/Table";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ConfirmDialog } from "../components/layout/ConfirmDialog";
 
 export default function Categories() {
   const [categories, setCategories] = useState<AdminCategory[]>([]);
@@ -28,8 +29,9 @@ export default function Categories() {
   // Form states
   const [name, setName] = useState("");
   const [icon, setIcon] = useState("Camera");
-  const [color, setColor] = useState("bg-secondary text-foreground border border-border");
+  const [color, setColor] = useState("bg-[var(--admin-elevated)] text-[var(--admin-text)] border border-border");
   const [submitting, setSubmitting] = useState(false);
+  const [deleteCategoryTarget, setDeleteCategoryTarget] = useState<AdminCategory | null>(null);
 
   const fetchCats = useCallback(async () => {
     try {
@@ -75,7 +77,7 @@ export default function Categories() {
     setSelectedCat(cat);
     setName(cat.name);
     setIcon(cat.icon || "Camera");
-    setColor(cat.color || "bg-secondary text-foreground border border-border");
+    setColor(cat.color || "bg-[var(--admin-elevated)] text-[var(--admin-text)] border border-border");
     setEditModalOpen(true);
   };
 
@@ -102,19 +104,26 @@ export default function Categories() {
     }
   };
 
-  const handleDelete = async (cat: AdminCategory) => {
+  const handleDelete = (cat: AdminCategory) => {
     if (cat.count && cat.count > 0) {
       toast.error(`Cannot delete category '${cat.name}' because ${cat.count} active gear items depend on it. Reassign items first.`);
       return;
     }
-    if (!confirm(`Are you sure you want to delete category '${cat.name}'?`)) return;
+    setDeleteCategoryTarget(cat);
+  };
 
+  const executeDeleteCategory = async () => {
+    if (!deleteCategoryTarget) return;
     try {
-      await productsService.deleteCategory(cat.id);
-      setCategories((prev) => prev.filter((c) => c.id !== cat.id));
+      setSubmitting(true);
+      await productsService.deleteCategory(deleteCategoryTarget.id);
+      setCategories((prev) => prev.filter((c) => c.id !== deleteCategoryTarget.id));
       toast.success("Category removed.");
+      setDeleteCategoryTarget(null);
     } catch {
       toast.error("Failed to remove category.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -130,12 +139,12 @@ export default function Categories() {
       label: "Category",
       render: (row) => (
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-[#171C23] flex items-center justify-center text-[#F5F5F5] border border-[rgba(161,161,170,0.18)]">
+          <div className="h-8 w-8 rounded-lg bg-[var(--admin-elevated)] flex items-center justify-center text-[var(--admin-text)] border border-[var(--admin-border)]">
             <Package className="h-4 w-4" />
           </div>
           <div>
-            <div className="font-bold text-[#F5F5F5] text-xs">{row.name}</div>
-            <div className="text-[10px] text-[#A1A1AA] font-mono">ID: {row.id}</div>
+            <div className="font-bold text-[var(--admin-text)] text-xs">{row.name}</div>
+            <div className="text-[11px] text-[var(--admin-text-muted)] font-mono">ID: {row.id}</div>
           </div>
         </div>
       ),
@@ -144,7 +153,7 @@ export default function Categories() {
       key: "icon",
       label: "Icon",
       render: (row) => (
-        <span className="px-2 py-0.5 rounded text-[11px] font-mono bg-[#171C23] text-[#A1A1AA] border border-[rgba(161,161,170,0.18)]">
+        <span className="px-2 py-0.5 rounded text-[11px] font-mono bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] border border-[var(--admin-border)]">
           {row.icon || "Package"}
         </span>
       ),
@@ -153,7 +162,7 @@ export default function Categories() {
       key: "count",
       label: "Products",
       render: (row) => (
-        <span className="font-mono text-xs font-semibold text-[#F5F5F5]">
+        <span className="font-mono text-xs font-semibold text-[var(--admin-text)]">
           {row.count || 0}
         </span>
       ),
@@ -162,7 +171,7 @@ export default function Categories() {
       key: "enabled",
       label: "Status",
       render: () => (
-        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
           Active
         </span>
       ),
@@ -175,14 +184,14 @@ export default function Categories() {
         <div className="flex items-center justify-end gap-1.5">
           <button
             onClick={() => handleOpenEdit(row)}
-            className="p-1.5 rounded-lg bg-[#171C23] hover:bg-white/10 text-[#F5F5F5] transition-all cursor-pointer border border-[rgba(161,161,170,0.18)]"
+            className="p-1.5 rounded-lg bg-[var(--admin-elevated)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] transition-colors cursor-pointer border border-[var(--admin-border)]"
             title="Edit category"
           >
             <Edit2 className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => handleDelete(row)}
-            className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-all cursor-pointer"
+            className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-colors cursor-pointer"
             title="Delete category"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -195,12 +204,12 @@ export default function Categories() {
   return (
     <div className="space-y-6">
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-border/50">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-[var(--admin-border)]">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#F5F5F5]">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--admin-text)]">
             Categories
           </h1>
-          <p className="text-xs text-[#A1A1AA] mt-0.5 font-medium">
+          <p className="text-xs text-[var(--admin-text-muted)] mt-0.5 font-medium">
             Manage product categories.
           </p>
         </div>
@@ -209,10 +218,10 @@ export default function Categories() {
           <button
             onClick={fetchCats}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[rgba(161,161,170,0.18)] bg-[#10151B] hover:bg-[#171C23] text-[#F5F5F5] text-xs font-medium transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs font-medium transition-colors cursor-pointer"
             title="Refresh categories"
           >
-            <RefreshCw className={cn("h-3.5 w-3.5 text-[#A1A1AA]", loading && "animate-spin")} />
+            <RefreshCw className={cn("h-3.5 w-3.5 text-[var(--admin-text-muted)]", loading && "animate-spin")} />
             <span>Refresh</span>
           </button>
           <button
@@ -220,7 +229,7 @@ export default function Categories() {
               setName("");
               setCreateModalOpen(true);
             }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-neutral-200 text-black font-semibold text-xs transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--admin-accent)] hover:bg-[var(--admin-accent-hover)] text-[var(--admin-bg)] font-semibold text-xs transition-colors cursor-pointer"
           >
             <Plus className="h-3.5 w-3.5" />
             <span>Add Category</span>
@@ -229,35 +238,35 @@ export default function Categories() {
       </div>
 
       {/* SEARCH BAR */}
-      <div className="flex items-center justify-between gap-3 bg-[#10151B] p-3 rounded-xl border border-[rgba(161,161,170,0.18)]">
+      <div className="flex items-center justify-between gap-3 bg-[var(--admin-card)] p-3 rounded-xl border border-[var(--admin-border)]">
         <div className="relative flex-1 max-w-sm">
-          <Package className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#A1A1AA]" />
+          <Package className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--admin-text-muted)]" />
           <input
             type="text"
-            placeholder="Search categories..."
+            placeholder="Search categories"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[#050709] text-[#F5F5F5] text-xs rounded-lg pl-9 pr-3 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none focus:border-white/40 font-medium placeholder:text-[#A1A1AA]"
+            className="w-full bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-lg pl-9 pr-3 py-2 border border-[var(--admin-border)] focus:outline-none focus:border-[var(--admin-text)]/40 font-medium placeholder:text-[var(--admin-text-muted)]"
           />
         </div>
-        <div className="text-xs font-mono text-[#A1A1AA]">
+        <div className="text-xs font-mono text-[var(--admin-text-muted)]">
           {filteredCategories.length} Categories Total
         </div>
       </div>
 
       {/* ERROR STATE */}
       {error && !loading ? (
-        <div className="bg-[#10151B] rounded-xl border border-red-500/20 p-8 text-center flex flex-col items-center justify-center space-y-3">
+        <div className="bg-[var(--admin-card)] rounded-xl border border-red-500/20 p-8 text-center flex flex-col items-center justify-center space-y-3">
           <div className="w-10 h-10 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center">
             <ShieldAlert className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-[#F5F5F5]">Database Sync Failed</h3>
-            <p className="text-xs text-[#A1A1AA] mt-1 max-w-sm">{error}</p>
+            <h3 className="text-sm font-semibold text-[var(--admin-text)]">Database Sync Failed</h3>
+            <p className="text-xs text-[var(--admin-text-muted)] mt-1 max-w-sm">{error}</p>
           </div>
           <button
             onClick={fetchCats}
-            className="px-4 py-2 rounded-lg bg-[#171C23] hover:bg-[#171C23]/80 text-[#F5F5F5] text-xs font-medium transition-colors border border-[rgba(161,161,170,0.18)] cursor-pointer"
+            className="px-4 py-2 rounded-lg bg-[var(--admin-elevated)] hover:bg-[var(--admin-elevated)]/80 text-[var(--admin-text)] text-xs font-medium transition-colors border border-[var(--admin-border)] cursor-pointer"
           >
             Retry Database Fetch
           </button>
@@ -277,13 +286,13 @@ export default function Categories() {
 
       {/* CREATE MODAL */}
       {createModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-md bg-card border border-border/80 rounded-xl shadow-xl p-5 space-y-4">
-            <div className="flex items-center justify-between border-b border-border/40 pb-3">
-              <h3 className="text-sm font-semibold text-foreground">Create New Category</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="w-full max-w-md bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-xl shadow-xl p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-[var(--admin-border)] pb-3">
+              <h3 className="text-sm font-semibold text-[var(--admin-text)]">Create New Category</h3>
               <button
                 onClick={() => setCreateModalOpen(false)}
-                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
+                className="p-1.5 rounded-md text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-elevated)] cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -291,29 +300,29 @@ export default function Categories() {
 
             <form onSubmit={handleCreate} className="space-y-4 text-xs">
               <div className="space-y-1.5">
-                <label className="font-semibold text-foreground">Category Name</label>
+                <label className="font-semibold text-[var(--admin-text)]">Category Name</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Cinema Lenses, Audio..."
+                  placeholder="e.g. Cinema Lenses, Audio"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-secondary/40 border border-border/70 text-foreground font-medium focus:outline-none focus:border-foreground/40"
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] font-medium focus:outline-none focus:border-[var(--admin-text)]/40"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/40">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--admin-border)]">
                 <button
                   type="button"
                   onClick={() => setCreateModalOpen(false)}
-                  className="px-3 py-1.5 rounded-lg bg-secondary text-muted-foreground hover:text-foreground font-medium transition-colors cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] font-medium transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-black font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                  className="px-3.5 py-1.5 rounded-lg bg-[var(--admin-success)] hover:opacity-90 text-white dark:text-[#111] font-semibold transition-colors cursor-pointer disabled:opacity-50"
                 >
                   {submitting ? "Saving..." : "Create Category"}
                 </button>
@@ -325,13 +334,13 @@ export default function Categories() {
 
       {/* EDIT MODAL */}
       {editModalOpen && selectedCat && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-md bg-card border border-border/80 rounded-xl shadow-xl p-5 space-y-4">
-            <div className="flex items-center justify-between border-b border-border/40 pb-3">
-              <h3 className="text-sm font-semibold text-foreground">Edit Category</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="w-full max-w-md bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-xl shadow-xl p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-[var(--admin-border)] pb-3">
+              <h3 className="text-sm font-semibold text-[var(--admin-text)]">Edit Category</h3>
               <button
                 onClick={() => setEditModalOpen(false)}
-                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
+                className="p-1.5 rounded-md text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-elevated)] cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -339,28 +348,28 @@ export default function Categories() {
 
             <form onSubmit={handleSaveEdit} className="space-y-4 text-xs">
               <div className="space-y-1.5">
-                <label className="font-semibold text-foreground">Category Name</label>
+                <label className="font-semibold text-[var(--admin-text)]">Category Name</label>
                 <input
                   type="text"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-secondary/40 border border-border/70 text-foreground font-medium focus:outline-none focus:border-foreground/40"
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] font-medium focus:outline-none focus:border-[var(--admin-text)]/40"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/40">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--admin-border)]">
                 <button
                   type="button"
                   onClick={() => setEditModalOpen(false)}
-                  className="px-3 py-1.5 rounded-lg bg-secondary text-muted-foreground hover:text-foreground font-medium transition-colors cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] font-medium transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-black font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                  className="px-3.5 py-1.5 rounded-lg bg-[var(--admin-success)] hover:opacity-90 text-white dark:text-[#111] font-semibold transition-colors cursor-pointer disabled:opacity-50"
                 >
                   {submitting ? "Saving..." : "Save Changes"}
                 </button>
@@ -369,6 +378,16 @@ export default function Categories() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        isOpen={!!deleteCategoryTarget}
+        onClose={() => setDeleteCategoryTarget(null)}
+        onConfirm={executeDeleteCategory}
+        title="Delete category"
+        description={`Remove category "${deleteCategoryTarget?.name || ""}"?`}
+        confirmLabel="Delete category"
+        destructive
+        loading={submitting}
+      />
     </div>
   );
 }

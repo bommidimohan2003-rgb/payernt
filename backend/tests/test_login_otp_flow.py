@@ -49,3 +49,30 @@ def test_login_otp_valid_flow():
     assert "token" in valid_data
     assert valid_data["user"]["email"] == test_email
     assert valid_data["user"]["fullName"] == "OTP Test User"
+
+
+def test_copy_otp_page_endpoint():
+    """Verify /api/auth/copy serves a micro-page that copies code without redirecting to login."""
+    res = client.get("/api/auth/copy?otp=654321")
+    assert res.status_code == 200
+    assert "text/html" in res.headers["content-type"]
+    html = res.text
+    assert "654321" in html
+    assert "Verification Code Copied" in html
+    assert "Return to your <strong>Payent</strong> tab" in html
+    assert "Paste code" in html
+    assert "navigator.clipboard.writeText" in html
+    # Ensure it does NOT redirect to /login
+    assert "window.location.href = '/login'" not in html
+    assert "window.location.replace('/login')" not in html
+
+
+def test_otp_email_template_rendering():
+    """Verify build_otp_email_html produces high-contrast inline styles with prominent OTP and Copy button."""
+    from email_service import build_otp_email_html
+    html = build_otp_email_html("789012", purpose="sign in to your paYent account", action_url="http://127.0.0.1:8001/api/auth/copy?otp=789012")
+    assert "789012" in html
+    assert "Copy Code (789012)" in html
+    assert "http://127.0.0.1:8001/api/auth/copy?otp=789012" in html
+    assert "#10b981" in html
+    assert "background-color: #090a0c" in html

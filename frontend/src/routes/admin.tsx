@@ -49,22 +49,19 @@ function AdminPageTransitionOutlet() {
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: shouldReduceMotion ? 0 : -4 }}
         transition={{
-          duration: shouldReduceMotion ? 0 : 0.2,
-          ease: "easeOut",
+          duration: shouldReduceMotion ? 0 : 0.18,
+          ease: [0.22, 1, 0.36, 1],
         }}
         className="w-full"
       >
         <Suspense
           fallback={
-            <div className="py-20 flex flex-col items-center justify-center space-y-3">
-              <div className="flex items-center gap-1 font-mono font-black text-sm tracking-widest text-emerald-500">
-                <span>PAYE₹NT</span>
-                <span className="text-muted-foreground/60">/</span>
-                <span className="text-xs text-muted-foreground">OPS</span>
+            <div className="py-20 flex flex-col items-center justify-center gap-3">
+              <div className="flex items-center gap-1.5 font-mono font-medium text-xs text-[var(--admin-text-secondary)]">
+                <span className="h-2 w-2 rounded-full bg-[var(--admin-success)]" />
+                <span>Payent Operations</span>
               </div>
-              <div className="w-16 h-0.5 bg-muted overflow-hidden rounded-full">
-                <div className="w-8 h-full bg-emerald-500 animate-[loading-bar_1s_ease-in-out_infinite]" />
-              </div>
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--admin-border)] border-t-[var(--admin-text)]" />
             </div>
           }
         >
@@ -81,6 +78,7 @@ function AdminLayout() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isDenied, setIsDenied] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const hasRedirectedRef = useRef(false);
 
   useEffect(() => {
@@ -158,14 +156,17 @@ function AdminLayout() {
       }
     >
       <div className="min-h-screen bg-[var(--admin-bg)] text-[var(--admin-text)] flex flex-col antialiased transition-colors duration-200">
-        <div className="flex flex-1 relative items-stretch">
-          {/* Collapsible Sidebar */}
-          <Sidebar />
+        <div className="flex flex-1 min-w-0 items-stretch">
+          {/* Docked Collapsible Sidebar */}
+          <Sidebar
+            mobileOpen={mobileSidebarOpen}
+            onMobileOpenChange={setMobileSidebarOpen}
+          />
 
           {/* Main Content Area */}
           <div className="flex-1 flex flex-col min-w-0">
-            <Topbar />
-            <main className="flex-grow p-4 md:p-6 lg:p-8 space-y-5 max-w-[1600px] mx-auto w-full">
+            <Topbar onOpenMobileMenu={() => setMobileSidebarOpen(true)} />
+            <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 max-w-[95rem] mx-auto w-full">
               <Breadcrumb />
               <AdminPageTransitionOutlet />
             </main>

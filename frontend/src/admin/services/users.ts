@@ -1,6 +1,7 @@
 import { adminApi, AdminUser, AdminAgent } from "./api";
 
 export const REAL_USER_EMAILS = new Set([
+  "mohanatta94@gmail.com",
   "shinyshakhina08@gmail.com",
   "vasnathchikkala@gmail.com",
   "bommidimohan304@gmail.com",

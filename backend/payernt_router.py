@@ -24,6 +24,7 @@ from config import (
     TWILIO_VERIFY_SERVICE_SID,
     IS_PRODUCTION,
     IS_MOCK_OTP_MODE,
+    FRONTEND_URL,
 )
 from database import (
     fetch_one,
@@ -54,9 +55,11 @@ from database import (
     increment_otp_attempt,
     record_failed_auth_attempt,
     check_auth_lockout,
+    check_otp_dispatch_rate_limit,
 )
 from email_service import (
     is_smtp_configured,
+    dispatch_otp_email,
     send_email_smtp,
     build_otp_email_html,
     build_otp_email_text,
@@ -779,12 +782,16 @@ def request_payernt_register_otp(data: PayerntRegisterOTPRequestSchema, request:
     clean_phone = re.sub(r"[^\d+]", "", raw_phone)
 
     client_ip = request.client.host if request and request.client else "unknown"
-    ip_key = f"payernt_reg_req_ip:{client_ip}"
-    is_locked, secs = record_failed_auth_attempt(ip_key, max_attempts=5, lock_duration_secs=600)
-    if is_locked:
+    is_limited, wait_secs = check_otp_dispatch_rate_limit(
+        f"payernt_reg:{clean_email}:{client_ip}",
+        min_interval_secs=3,
+        max_per_window=10,
+        window_secs=300
+    )
+    if is_limited:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Too many registration requests. Please try again in {max(1, secs // 60)} minutes."
+            detail=f"Please wait {wait_secs} seconds before requesting another code."
         )
 
     # Check if verified account exists
@@ -799,21 +806,19 @@ def request_payernt_register_otp(data: PayerntRegisterOTPRequestSchema, request:
     save_otp(clean_email, clean_phone, otp_code)
     logger.info(f"[Payernt Register OTP] Code generated for {clean_email}")
 
-    email_sent = False
-    if is_smtp_configured():
-        try:
-            subject = f"{otp_code} is your Payernt verification code"
-            html = build_otp_email_html(otp_code, "register your Payernt lender account")
-            text = build_otp_email_text(otp_code, "register your Payernt lender account")
-            email_sent, err = send_email_smtp(clean_email, subject, html, text)
-            if email_sent:
-                logger.info(f"Payernt registration OTP email dispatched to {clean_email}")
-            else:
-                logger.warning(f"Failed to dispatch Payernt registration OTP email: {err}")
-        except Exception as e:
-            logger.error(f"Error during Payernt registration OTP email dispatch: {e}")
-
+    host = request.headers.get("host") if request else ""
+    proto = "https" if request and (request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https") else "http"
+    backend_base = f"{proto}://{host}" if host else os.getenv("BACKEND_URL", "http://127.0.0.1:8001")
+    action_url = f"{backend_base}/api/auth/copy?otp={otp_code}"
+    email_sent, err = dispatch_otp_email(
+        clean_email,
+        otp_code,
+        purpose="register your Payernt lender account",
+        action_url=action_url,
+        sync=False
+    )
     if email_sent:
+        logger.info(f"Payernt registration OTP email queued for {clean_email}")
         return {"success": True, "message": "Verification code has been sent to your email."}
     return {"success": True, "otp": otp_code, "message": "Verification code generated successfully."}
 
@@ -1212,21 +1217,16 @@ def request_payernt_login_otp(data: PayerntLoginOTPRequestSchema, request: Reque
     """
     clean_email = str(data.email).strip().lower()
     client_ip = request.client.host if request and request.client else "unknown"
-    ip_key = f"payernt_login_otp_req_ip:{client_ip}"
-    user_key = f"payernt_login_otp_req_user:{clean_email}"
-
-    is_locked_ip, secs_ip = record_failed_auth_attempt(ip_key, max_attempts=10, lock_duration_secs=600)
-    if is_locked_ip:
+    is_limited, wait_secs = check_otp_dispatch_rate_limit(
+        f"payernt_login:{clean_email}:{client_ip}",
+        min_interval_secs=3,
+        max_per_window=10,
+        window_secs=300
+    )
+    if is_limited:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Too many OTP requests from this IP. Please try again in {max(1, secs_ip // 60)} minutes."
-        )
-
-    is_locked_user, secs_user = record_failed_auth_attempt(user_key, max_attempts=5, lock_duration_secs=600)
-    if is_locked_user:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Too many OTP requests for this account. Please try again in {max(1, secs_user // 60)} minutes."
+            detail=f"Please wait {wait_secs} seconds before requesting another code."
         )
 
     account = _find_payernt_or_fallback_account(clean_email)
@@ -1281,21 +1281,19 @@ def request_payernt_login_otp(data: PayerntLoginOTPRequestSchema, request: Reque
     save_otp(clean_email, clean_phone, otp_code)
     logger.info(f"[Payernt Login OTP] 6-digit code generated for {clean_email}")
 
-    email_sent = False
-    if is_smtp_configured():
-        try:
-            subject = f"{otp_code} is your Payernt sign-in code"
-            html = build_otp_email_html(otp_code, "sign in to your Payernt account")
-            text = build_otp_email_text(otp_code, "sign in to your Payernt account")
-            email_sent, err = send_email_smtp(clean_email, subject, html, text)
-            if email_sent:
-                logger.info(f"Payernt login OTP email dispatched to {clean_email}")
-            else:
-                logger.warning(f"Failed to dispatch Payernt login OTP email: {err}")
-        except Exception as e:
-            logger.error(f"Error during Payernt login OTP email dispatch: {e}")
-
+    host = request.headers.get("host") if request else ""
+    proto = "https" if request and (request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https") else "http"
+    backend_base = f"{proto}://{host}" if host else os.getenv("BACKEND_URL", "http://127.0.0.1:8001")
+    action_url = f"{backend_base}/api/auth/copy?otp={otp_code}"
+    email_sent, err = dispatch_otp_email(
+        clean_email,
+        otp_code,
+        purpose="sign in to your Payernt account",
+        action_url=action_url,
+        sync=False
+    )
     if email_sent:
+        logger.info(f"Payernt login OTP email queued for {clean_email}")
         return {"success": True, "message": "Verification code has been sent to your email."}
     return {"success": True, "otp": otp_code, "message": "Verification code generated successfully."}
 

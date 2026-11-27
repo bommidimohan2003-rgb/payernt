@@ -6,7 +6,7 @@ interface StatsCardProps {
   value: string | number;
   change?: string | number;
   trend?: "up" | "down" | "neutral";
-  icon: LucideIcon;
+  icon?: LucideIcon;
   subtext?: string;
   loading?: boolean;
   error?: boolean;
@@ -30,33 +30,44 @@ export function StatsCard({
 }: StatsCardProps) {
   if (loading) {
     return (
-      <div className={cn("p-5 rounded-2xl bg-card border border-border/80 shadow-xs", className)}>
+      <div
+        className={cn(
+          "p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)]",
+          className
+        )}
+      >
         <div className="flex items-center justify-between mb-3">
-          <div className="h-3 w-24 bg-muted rounded"></div>
-          <div className="h-8 w-8 bg-muted rounded-xl"></div>
+          <div className="h-3 w-24 bg-[var(--admin-elevated)] rounded" />
+          <div className="h-4 w-4 bg-[var(--admin-elevated)] rounded" />
         </div>
-        <div className="h-7 w-32 bg-muted rounded mb-2"></div>
-        <div className="h-3 w-20 bg-muted rounded"></div>
+        <div className="h-7 w-28 bg-[var(--admin-elevated)] rounded mb-3" />
+        <div className="h-3 w-20 bg-[var(--admin-elevated)] rounded" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className={cn("p-5 rounded-2xl bg-card border border-destructive/30 shadow-xs flex flex-col justify-between", className)}>
+      <div
+        className={cn(
+          "p-5 rounded-xl bg-[var(--admin-card)] border border-destructive/30 flex flex-col justify-between",
+          className
+        )}
+      >
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{title}</span>
-          <AlertCircle className="h-4 w-4 text-destructive" />
+          <span className="text-xs font-medium text-[var(--admin-text-secondary)]">
+            {title}
+          </span>
+          <AlertCircle className="h-4 w-4 text-destructive" strokeWidth={1.5} />
         </div>
-        <div className="my-2">
-          <p className="text-xs font-medium text-destructive">Unable to load metric</p>
-        </div>
+        <p className="text-xs text-destructive my-2">Unable to load metric</p>
         {onRetry && (
           <button
             onClick={onRetry}
-            className="flex items-center gap-1 text-[11px] font-bold text-primary hover:underline cursor-pointer pt-1"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--admin-text)] hover:underline cursor-pointer pt-1"
           >
-            <RefreshCw className="h-3 w-3" /> Retry
+            <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.5} />
+            <span>Retry</span>
           </button>
         )}
       </div>
@@ -79,40 +90,49 @@ export function StatsCard({
           : undefined
       }
       className={cn(
-        "p-5 rounded-2xl bg-card border border-border/80 hover:border-border transition-colors shadow-xs flex flex-col justify-between",
+        "p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] transition-colors duration-150 flex flex-col justify-between",
+        onClick && "hover:border-[var(--admin-text-muted)] cursor-pointer",
         className
       )}
     >
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{title}</span>
-        <div className="h-8 w-8 rounded-xl bg-secondary flex items-center justify-center text-foreground border border-border/60 shrink-0">
-          <Icon className="h-4 w-4" />
-        </div>
+        <span className="text-xs font-medium text-[var(--admin-text-secondary)]">
+          {title}
+        </span>
+        {Icon && (
+          <Icon className="h-4 w-4 text-[var(--admin-text-muted)] shrink-0" strokeWidth={1.5} />
+        )}
       </div>
 
       <div className="my-1">
-        <div className="text-2xl font-black tracking-tight text-foreground font-mono">{value}</div>
+        <div className="text-2xl font-medium tracking-tight text-[var(--admin-text)] tabular-nums">
+          {value}
+        </div>
       </div>
 
-      <div className="flex items-center justify-between pt-2 border-t border-border/30 text-[11px]">
-        {change !== undefined && (
-          <div
-            className={cn(
-              "flex items-center gap-1 font-semibold",
-              trend === "up"
-                ? "text-emerald-600 dark:text-emerald-400"
-                : trend === "down"
-                ? "text-destructive"
-                : "text-muted-foreground"
-            )}
-          >
-            {trend === "up" && <TrendingUp className="h-3 w-3" />}
-            {trend === "down" && <TrendingDown className="h-3 w-3" />}
-            <span>{change}</span>
-          </div>
-        )}
-        {subtext && <span className="text-muted-foreground truncate">{subtext}</span>}
-      </div>
+      {(change !== undefined || subtext) && (
+        <div className="flex items-center justify-between gap-2 pt-3 mt-1 border-t border-[var(--admin-border)] text-xs">
+          {change !== undefined && (
+            <div
+              className={cn(
+                "flex items-center gap-1 font-medium tabular-nums",
+                trend === "up"
+                  ? "text-[var(--admin-success)]"
+                  : trend === "down"
+                  ? "text-[var(--admin-error)]"
+                  : "text-[var(--admin-text-muted)]"
+              )}
+            >
+              {trend === "up" && <TrendingUp className="h-3.5 w-3.5" strokeWidth={1.5} />}
+              {trend === "down" && <TrendingDown className="h-3.5 w-3.5" strokeWidth={1.5} />}
+              <span>{change}</span>
+            </div>
+          )}
+          {subtext && (
+            <span className="text-[var(--admin-text-muted)] truncate">{subtext}</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

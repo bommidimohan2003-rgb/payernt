@@ -13,7 +13,7 @@ export interface TypingIndicatorProps {
  * - Background: Light grey (#F5F6F8)
  * - Border: Subtle border (#E1E4E8)
  * - Corner geometry: rounded-2xl rounded-tl-xs
- * - Avatar: Custom paYent P brand symbol (PayentAgentIcon size 26)
+ * - Avatar: Custom paYent AI Agent Neural Nexus Symbol (PayentAgentIcon size 26)
  * - Three smoothly animated dots in brand green (#16A36A)
  */
 export function TypingIndicator({ className = "" }: TypingIndicatorProps) {
@@ -30,7 +30,7 @@ export function TypingIndicator({ className = "" }: TypingIndicatorProps) {
     >
       <div className="flex items-center gap-2.5">
         {/* Assistant Avatar */}
-        <div className="shrink-0">
+        <div className="shrink-0 text-neutral-800 dark:text-neutral-200">
           <PayentAgentIcon size={26} />
         </div>
 

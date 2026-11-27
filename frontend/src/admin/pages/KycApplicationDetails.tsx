@@ -334,7 +334,7 @@ export default function KycApplicationDetails() {
     return (
       <div className="py-20 flex flex-col items-center justify-center space-y-4">
         <Loader size="lg" message="Loading KYC application details..." />
-        <span className="text-xs text-muted-foreground font-mono">
+        <span className="text-xs text-[var(--admin-text-muted)] font-mono">
           Fetching verification record #{applicationId?.slice(0, 8)}...
         </span>
       </div>
@@ -345,17 +345,17 @@ export default function KycApplicationDetails() {
   if (error || !verification) {
     return (
       <div className="max-w-4xl mx-auto py-12 px-4">
-        <div className="p-8 rounded-2xl bg-card border border-border shadow-xs text-center space-y-4">
+        <div className="p-8 rounded-2xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs text-center space-y-4">
           <div className="w-14 h-14 rounded-2xl bg-rose-500/10 text-rose-500 mx-auto flex items-center justify-center border border-rose-500/20">
             <FileX className="h-7 w-7" />
           </div>
           <div className="space-y-1">
-            <h2 className="text-lg font-bold text-foreground">
+            <h2 className="text-lg font-bold text-[var(--admin-text)]">
               {error || "KYC Application Not Found"}
             </h2>
-            <p className="text-xs text-muted-foreground max-w-md mx-auto">
+            <p className="text-xs text-[var(--admin-text-muted)] max-w-md mx-auto">
               The requested KYC verification application (ID:{" "}
-              <code className="font-mono text-foreground">
+              <code className="font-mono text-[var(--admin-text)]">
                 {applicationId || "unknown"}
               </code>
               ) could not be found in the database, or you may lack
@@ -365,7 +365,7 @@ export default function KycApplicationDetails() {
           <div className="pt-2 flex items-center justify-center gap-3">
             <button
               onClick={handleBackNavigation}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-secondary hover:bg-secondary/80 text-foreground transition-colors cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-[var(--admin-elevated)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] transition-colors cursor-pointer"
             >
               <ArrowLeft className="h-4 w-4" />
               <span>Back to KYC Applications</span>
@@ -397,13 +397,13 @@ export default function KycApplicationDetails() {
         <div className="flex items-center gap-3">
           <button
             onClick={handleBackNavigation}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-secondary hover:bg-secondary/80 text-foreground border border-border/60 transition-colors cursor-pointer shadow-2xs"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[var(--admin-elevated)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] border border-[var(--admin-border)] transition-colors cursor-pointer shadow-2xs"
           >
             <ArrowLeft className="h-4 w-4" />
             <span>Back to KYC Applications</span>
           </button>
-          <span className="text-muted-foreground/40 hidden sm:inline">•</span>
-          <span className="text-xs text-muted-foreground hidden sm:inline">
+          <span className="text-[var(--admin-text-muted)]/40 hidden sm:inline">•</span>
+          <span className="text-xs text-[var(--admin-text-muted)] hidden sm:inline">
             KYC Review Console
           </span>
         </div>
@@ -412,7 +412,7 @@ export default function KycApplicationDetails() {
           <button
             onClick={() => loadDetails(true)}
             disabled={refreshing}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground border border-border/60 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-[var(--admin-elevated)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] border border-[var(--admin-border)] transition-colors cursor-pointer"
             title="Refresh application data"
           >
             <RefreshCw
@@ -427,7 +427,7 @@ export default function KycApplicationDetails() {
       </div>
 
       {/* Main Header Banner */}
-      <div className="p-6 rounded-2xl bg-card border border-border shadow-xs">
+      <div className="p-6 rounded-2xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           {/* Left: Applicant Identity & Badges */}
           <div className="flex items-start sm:items-center gap-4">
@@ -438,15 +438,15 @@ export default function KycApplicationDetails() {
             />
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2.5">
-                <h1 className="text-xl font-bold text-foreground">
+                <h1 className="text-xl font-bold text-[var(--admin-text)]">
                   {verification.applicant_name || "Applicant Name"}
                 </h1>
                 <span
                   className={cn(
                     "inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md",
                     isVendor
-                      ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
-                      : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20",
+                      ? "bg-[var(--admin-elevated)] text-[var(--admin-text)] border border-[var(--admin-border)]"
+                      : "bg-[var(--admin-elevated)] text-[var(--admin-text-secondary)] border border-[var(--admin-border)]",
                   )}
                 >
                   {isVendor ? (
@@ -460,27 +460,27 @@ export default function KycApplicationDetails() {
                 </span>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1 font-mono text-foreground/80">
-                  <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+              <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--admin-text-muted)]">
+                <span className="flex items-center gap-1 font-mono text-[var(--admin-text)]/80">
+                  <Mail className="h-3.5 w-3.5 text-[var(--admin-text-muted)]" />
                   {verification.email}
                 </span>
                 {verification.applicant_phone && (
                   <>
-                    <span className="text-muted-foreground/40">•</span>
-                    <span className="flex items-center gap-1 font-mono text-foreground/80">
-                      <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-[var(--admin-text-muted)]/40">•</span>
+                    <span className="flex items-center gap-1 font-mono text-[var(--admin-text)]/80">
+                      <Phone className="h-3.5 w-3.5 text-[var(--admin-text-muted)]" />
                       {verification.applicant_phone}
                     </span>
                   </>
                 )}
-                <span className="text-muted-foreground/40">•</span>
-                <div className="flex items-center gap-1 font-mono text-[11px] bg-secondary/80 px-2 py-0.5 rounded-md border border-border/60">
+                <span className="text-[var(--admin-text-muted)]/40">•</span>
+                <div className="flex items-center gap-1 font-mono text-[11px] bg-[var(--admin-elevated)] px-2 py-0.5 rounded-md border border-[var(--admin-border)]">
                   <span>ID: {verification.id.slice(0, 16)}...</span>
                   <button
                     onClick={handleCopyId}
                     title="Copy Full Application ID"
-                    className="hover:text-foreground transition-colors ml-1 cursor-pointer"
+                    className="hover:text-[var(--admin-text)] transition-colors ml-1 cursor-pointer"
                   >
                     <Copy className="h-3 w-3" />
                   </button>
@@ -490,34 +490,34 @@ export default function KycApplicationDetails() {
           </div>
 
           {/* Right: Status Badge & Primary Action Bar */}
-          <div className="flex flex-col sm:items-end gap-3 pt-2 md:pt-0 border-t md:border-t-0 border-border/60">
+          <div className="flex flex-col sm:items-end gap-3 pt-2 md:pt-0 border-t md:border-t-0 border-[var(--admin-border)]">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+              <span className="text-[11px] font-bold text-[var(--admin-text-muted)]">
                 Status:
               </span>
               <span
                 className={cn(
-                  "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border tracking-wide",
+                  "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ",
                   statusUpper === "APPROVED"
                     ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                     : statusUpper === "PENDING"
                       ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
                       : statusUpper === "REJECTED"
                         ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
-                        : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20",
+                        : "bg-amber-500/10 text-[var(--admin-warning)] border-[var(--admin-warning)]/20",
                 )}
               >
                 {statusUpper === "APPROVED" && (
                   <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
                 )}
                 {statusUpper === "PENDING" && (
-                  <Clock className="h-3.5 w-3.5 text-amber-500 animate-pulse" />
+                  <Clock className="h-3.5 w-3.5 text-amber-500" />
                 )}
                 {statusUpper === "REJECTED" && (
                   <XCircle className="h-3.5 w-3.5 text-rose-500" />
                 )}
                 {["NEEDS_INFORMATION", "NEEDS_INFO"].includes(statusUpper) && (
-                  <HelpCircle className="h-3.5 w-3.5 text-indigo-500" />
+                  <HelpCircle className="h-3.5 w-3.5 text-[var(--admin-warning)]" />
                 )}
                 {statusUpper === "PENDING"
                   ? "Pending Review"
@@ -537,7 +537,7 @@ export default function KycApplicationDetails() {
                   setActionReason("");
                   setIsRequestInfoOpen(true);
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500 hover:text-white border border-amber-500/30 transition-all cursor-pointer shadow-xs"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500 hover:text-white border border-amber-500/30 transition-colors cursor-pointer shadow-xs"
               >
                 <HelpCircle className="h-3.5 w-3.5" />
                 <span>Request Info</span>
@@ -549,7 +549,7 @@ export default function KycApplicationDetails() {
                   setActionReason("");
                   setIsRejectOpen(true);
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white border border-rose-500/30 transition-all cursor-pointer shadow-xs"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white border border-rose-500/30 transition-colors cursor-pointer shadow-xs"
               >
                 <XCircle className="h-3.5 w-3.5" />
                 <span>Reject KYC</span>
@@ -558,7 +558,7 @@ export default function KycApplicationDetails() {
               <button
                 type="button"
                 onClick={() => setIsApproveOpen(true)}
-                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-all cursor-pointer shadow-sm"
+                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors cursor-pointer shadow-sm"
               >
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 <span>Approve KYC</span>
@@ -586,11 +586,11 @@ export default function KycApplicationDetails() {
                 : "Information Requested from Applicant:"}
             </span>
           </div>
-          <p className="text-foreground leading-relaxed pl-6 font-medium">
+          <p className="text-[var(--admin-text)] leading-relaxed pl-6 font-medium">
             {verification.rejection_reason}
           </p>
           {verification.reviewed_by && (
-            <p className="text-[10px] text-muted-foreground pl-6">
+            <p className="text-[11px] text-[var(--admin-text-muted)] pl-6">
               Recorded by{" "}
               <span className="font-mono">{verification.reviewed_by}</span> on{" "}
               {verification.reviewed_at
@@ -606,42 +606,42 @@ export default function KycApplicationDetails() {
         {/* Left Column: Applicant & Document Info + Review Audit */}
         <div className="lg:col-span-5 space-y-6">
           {/* Applicant Profile Information Card */}
-          <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-border/60 pb-3">
-              <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+          <div className="p-5 rounded-2xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-[var(--admin-border)] pb-3">
+              <h2 className="text-sm font-bold text-[var(--admin-text)] flex items-center gap-2">
                 <User className="h-4 w-4 text-primary" />
                 <span>Applicant Details</span>
               </h2>
-              <span className="text-[10px] font-mono text-muted-foreground bg-secondary px-2 py-0.5 rounded-md border border-border/60">
+              <span className="text-[11px] font-mono text-[var(--admin-text-muted)] bg-[var(--admin-elevated)] px-2 py-0.5 rounded-md border border-[var(--admin-border)]">
                 {verification.verification_source || "Manual Admin Review"}
               </span>
             </div>
 
             <div className="space-y-3 text-xs">
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Full Legal Name:</span>
-                <span className="font-semibold text-foreground">
+                <span className="text-[var(--admin-text-muted)]">Full Legal Name:</span>
+                <span className="font-semibold text-[var(--admin-text)]">
                   {verification.applicant_name || "Applicant"}
                 </span>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Registered Email:</span>
-                <span className="font-mono font-medium text-foreground">
+                <span className="text-[var(--admin-text-muted)]">Registered Email:</span>
+                <span className="font-mono font-medium text-[var(--admin-text)]">
                   {verification.email}
                 </span>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Contact Phone:</span>
-                <span className="font-mono text-foreground">
+                <span className="text-[var(--admin-text-muted)]">Contact Phone:</span>
+                <span className="font-mono text-[var(--admin-text)]">
                   {verification.applicant_phone || "Not provided"}
                 </span>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Account Role:</span>
-                <span className="font-bold text-foreground">
+                <span className="text-[var(--admin-text-muted)]">Account Role:</span>
+                <span className="font-bold text-[var(--admin-text)]">
                   {isVendor
                     ? "Payernt Vendor (Equipment Owner)"
                     : "Payrent Renter (Customer)"}
@@ -649,15 +649,15 @@ export default function KycApplicationDetails() {
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">User ID:</span>
-                <span className="font-mono text-[11px] text-muted-foreground">
+                <span className="text-[var(--admin-text-muted)]">User ID:</span>
+                <span className="font-mono text-[11px] text-[var(--admin-text-muted)]">
                   {verification.user_id || "—"}
                 </span>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Submitted At:</span>
-                <span className="text-foreground">
+                <span className="text-[var(--admin-text-muted)]">Submitted At:</span>
+                <span className="text-[var(--admin-text)]">
                   {new Date(
                     verification.submitted_at || verification.created_at || "",
                   ).toLocaleString()}
@@ -666,7 +666,7 @@ export default function KycApplicationDetails() {
             </div>
 
             {/* Security / Impact Notice */}
-            <div className="p-3 rounded-xl bg-secondary/40 border border-border/60 flex items-start gap-2.5 text-[11px] text-muted-foreground">
+            <div className="p-3 rounded-xl bg-[var(--admin-elevated)] border border-[var(--admin-border)] flex items-start gap-2.5 text-[11px] text-[var(--admin-text-muted)]">
               <Lock className="h-4 w-4 text-primary shrink-0 mt-0.5" />
               <span>
                 {isVendor
@@ -677,58 +677,58 @@ export default function KycApplicationDetails() {
           </div>
 
           {/* Submitted Document Metadata Card */}
-          <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-border/60 pb-3">
-              <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+          <div className="p-5 rounded-2xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-[var(--admin-border)] pb-3">
+              <h2 className="text-sm font-bold text-[var(--admin-text)] flex items-center gap-2">
                 <FileText className="h-4 w-4 text-primary" />
                 <span>Document Details</span>
               </h2>
-              <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20">
+              <span className="text-[11px] font-bold text-[var(--admin-text)] bg-[var(--admin-elevated)] px-2 py-0.5 rounded-md border border-[var(--admin-border)]">
                 {isAadhaar ? "Government ID: Aadhaar" : "Government ID: PAN"}
               </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="p-3 rounded-xl bg-secondary/30 border border-border/60">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+              <div className="p-3 rounded-xl bg-[var(--admin-elevated)] border border-[var(--admin-border)]">
+                <span className="text-[11px] font-bold text-[var(--admin-text-muted)] block mb-1">
                   Document Type
                 </span>
-                <span className="font-bold text-foreground">
+                <span className="font-bold text-[var(--admin-text)]">
                   {isAadhaar ? "Aadhaar Card" : "PAN Card"}
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-secondary/30 border border-border/60">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+              <div className="p-3 rounded-xl bg-[var(--admin-elevated)] border border-[var(--admin-border)]">
+                <span className="text-[11px] font-bold text-[var(--admin-text-muted)] block mb-1">
                   Masked Number
                 </span>
-                <span className="font-mono font-bold text-foreground">
+                <span className="font-mono font-bold text-[var(--admin-text)]">
                   {verification.document_number_masked || "••••••••"}
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-secondary/30 border border-border/60">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+              <div className="p-3 rounded-xl bg-[var(--admin-elevated)] border border-[var(--admin-border)]">
+                <span className="text-[11px] font-bold text-[var(--admin-text-muted)] block mb-1">
                   Original File Name
                 </span>
-                <span className="font-mono text-[11px] text-foreground truncate block">
+                <span className="font-mono text-[11px] text-[var(--admin-text)] truncate block">
                   {document?.fileName ||
                     verification.document_file_name ||
                     "document.jpg"}
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-secondary/30 border border-border/60">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+              <div className="p-3 rounded-xl bg-[var(--admin-elevated)] border border-[var(--admin-border)]">
+                <span className="text-[11px] font-bold text-[var(--admin-text-muted)] block mb-1">
                   File Size / Type
                 </span>
-                <span className="text-foreground">
+                <span className="text-[var(--admin-text)]">
                   {document?.fileSize
                     ? `${(document.fileSize / 1024).toFixed(1)} KB`
                     : verification.document_file_size
                       ? `${(verification.document_file_size / 1024).toFixed(1)} KB`
                       : "—"}{" "}
-                  <span className="text-[10px] text-muted-foreground font-mono">
+                  <span className="text-[11px] text-[var(--admin-text-muted)] font-mono">
                     (
                     {document?.fileType ||
                       verification.document_mime_type ||
@@ -741,8 +741,8 @@ export default function KycApplicationDetails() {
           </div>
 
           {/* Audit History & Decision Trail */}
-          <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
-            <h2 className="text-sm font-bold text-foreground flex items-center gap-2 border-b border-border/60 pb-3">
+          <div className="p-5 rounded-2xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs space-y-4">
+            <h2 className="text-sm font-bold text-[var(--admin-text)] flex items-center gap-2 border-b border-[var(--admin-border)] pb-3">
               <Clock className="h-4 w-4 text-primary" />
               <span>Audit Trail & Review History</span>
             </h2>
@@ -753,12 +753,12 @@ export default function KycApplicationDetails() {
                 {verification.audit_history.map((entry, idx) => (
                   <div
                     key={idx}
-                    className="p-3 rounded-xl bg-secondary/30 border border-border/60 text-xs space-y-1.5"
+                    className="p-3 rounded-xl bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-xs space-y-1.5"
                   >
                     <div className="flex items-center justify-between">
                       <span
                         className={cn(
-                          "px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border",
+                          "px-2 py-0.5 rounded-md text-[11px] font-bold  border",
                           entry.decision === "APPROVED"
                             ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
                             : entry.decision === "REJECTED"
@@ -768,20 +768,20 @@ export default function KycApplicationDetails() {
                       >
                         {entry.decision}
                       </span>
-                      <span className="text-[10px] text-muted-foreground font-mono">
+                      <span className="text-[11px] text-[var(--admin-text-muted)] font-mono">
                         {new Date(entry.reviewed_at).toLocaleString()}
                       </span>
                     </div>
 
-                    <div className="text-[11px] text-muted-foreground">
+                    <div className="text-[11px] text-[var(--admin-text-muted)]">
                       Reviewed by:{" "}
-                      <span className="font-mono text-foreground">
+                      <span className="font-mono text-[var(--admin-text)]">
                         {entry.reviewer_email}
                       </span>
                     </div>
 
                     {entry.reason && (
-                      <p className="text-[11px] text-foreground bg-card/60 p-2 rounded-lg border border-border/40">
+                      <p className="text-[11px] text-[var(--admin-text)] bg-[var(--admin-card)] p-2 rounded-lg border border-[var(--admin-border)]">
                         {entry.reason}
                       </p>
                     )}
@@ -789,26 +789,26 @@ export default function KycApplicationDetails() {
                 ))}
               </div>
             ) : verification.reviewed_by ? (
-              <div className="p-3 rounded-xl bg-secondary/30 border border-border/60 text-xs space-y-1">
+              <div className="p-3 rounded-xl bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-xs space-y-1">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-foreground">
+                  <span className="font-bold text-[var(--admin-text)]">
                     Last Decision:
                   </span>
-                  <span className="text-muted-foreground font-mono text-[10px]">
+                  <span className="text-[var(--admin-text-muted)] font-mono text-[11px]">
                     {verification.reviewed_at
                       ? new Date(verification.reviewed_at).toLocaleString()
                       : "—"}
                   </span>
                 </div>
-                <div className="text-[11px] text-muted-foreground">
+                <div className="text-[11px] text-[var(--admin-text-muted)]">
                   Reviewed by:{" "}
-                  <span className="font-mono text-foreground">
+                  <span className="font-mono text-[var(--admin-text)]">
                     {verification.reviewed_by}
                   </span>
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground italic py-2">
+              <p className="text-xs text-[var(--admin-text-muted)] py-2">
                 No previous review actions recorded. This application is
                 awaiting initial decision.
               </p>
@@ -818,38 +818,38 @@ export default function KycApplicationDetails() {
 
         {/* Right Column: Embedded Identity Document Preview Canvas */}
         <div className="lg:col-span-7 space-y-4">
-          <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4 flex flex-col h-full">
+          <div className="p-5 rounded-2xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs space-y-4 flex flex-col h-full">
             {/* Viewer Header with Title & Zoom/Rotation Toolbar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--admin-border)] pb-3">
               <div>
-                <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <h2 className="text-sm font-bold text-[var(--admin-text)] flex items-center gap-2">
                   <ShieldCheck className="h-4 w-4 text-emerald-500" />
                   <span>Submitted Identity Document Preview</span>
                 </h2>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[11px] text-[var(--admin-text-muted)]">
                   Secure encrypted preview rendered directly in the admin
                   console.
                 </p>
               </div>
 
               {/* Viewer Interactive Controls */}
-              <div className="flex items-center gap-1 bg-secondary/80 p-1 rounded-xl border border-border/80">
+              <div className="flex items-center gap-1 bg-[var(--admin-elevated)] p-1 rounded-xl border border-[var(--admin-border)]">
                 <button
                   type="button"
                   onClick={handleZoomOut}
                   title="Zoom Out"
-                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-card)] transition-colors cursor-pointer"
                 >
                   <ZoomOut className="h-4 w-4" />
                 </button>
-                <span className="text-[11px] font-mono px-1.5 text-muted-foreground select-none">
+                <span className="text-[11px] font-mono px-1.5 text-[var(--admin-text-muted)] select-none">
                   {Math.round(zoomLevel * 100)}%
                 </span>
                 <button
                   type="button"
                   onClick={handleZoomIn}
                   title="Zoom In"
-                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-card)] transition-colors cursor-pointer"
                 >
                   <ZoomIn className="h-4 w-4" />
                 </button>
@@ -858,7 +858,7 @@ export default function KycApplicationDetails() {
                   type="button"
                   onClick={handleRotate}
                   title="Rotate 90 degrees"
-                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-card)] transition-colors cursor-pointer"
                 >
                   <RotateCw className="h-4 w-4" />
                 </button>
@@ -866,7 +866,7 @@ export default function KycApplicationDetails() {
                   type="button"
                   onClick={handleResetZoom}
                   title="Fit to Window"
-                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-card)] transition-colors cursor-pointer"
                 >
                   <Maximize2 className="h-4 w-4" />
                 </button>
@@ -877,7 +877,7 @@ export default function KycApplicationDetails() {
                       type="button"
                       onClick={handleOpenDocInNewTab}
                       title="Open full size in new tab"
-                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer"
+                      className="p-1.5 rounded-lg text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-card)] transition-colors cursor-pointer"
                     >
                       <ExternalLink className="h-4 w-4" />
                     </button>
@@ -887,7 +887,7 @@ export default function KycApplicationDetails() {
             </div>
 
             {/* Document Preview Viewport Canvas */}
-            <div className="relative flex-1 min-h-[480px] max-h-[640px] rounded-2xl bg-neutral-950 border border-neutral-800 overflow-auto flex items-center justify-center p-4">
+            <div className="relative flex-1 min-h-120 max-h-160 rounded-2xl bg-neutral-950 border border-neutral-800 overflow-auto flex items-center justify-center p-4">
               {docLoading ? (
                 <div className="flex flex-col items-center justify-center gap-3 text-neutral-400">
                   <Loader
@@ -915,7 +915,7 @@ export default function KycApplicationDetails() {
                   <iframe
                     src={document.fileData}
                     title="PDF Document Preview"
-                    className="w-full h-full min-h-[460px] rounded-xl border border-neutral-800 bg-white"
+                    className="w-full h-full min-h-112 rounded-xl border border-neutral-800 bg-white"
                   />
                 ) : (
                   <div
@@ -928,7 +928,7 @@ export default function KycApplicationDetails() {
                     <img
                       src={document.fileData}
                       alt="Submitted Identity Document"
-                      className="max-h-[520px] max-w-full object-contain rounded-lg shadow-2xl"
+                      className="max-h-128 max-w-full object-contain rounded-lg shadow-2xl"
                     />
                   </div>
                 )
@@ -947,18 +947,18 @@ export default function KycApplicationDetails() {
             </div>
 
             {/* Verification Checklist Guidelines */}
-            <div className="p-3.5 rounded-xl bg-secondary/30 border border-border/60 text-xs space-y-1.5">
-              <span className="font-bold text-foreground text-[11px] uppercase tracking-wider block">
+            <div className="p-3.5 rounded-xl bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-xs space-y-1.5">
+              <span className="font-bold text-[var(--admin-text)] text-[11px] block">
                 Verification Checklist:
               </span>
-              <ul className="text-[11px] text-muted-foreground space-y-1 list-disc pl-4">
+              <ul className="text-[11px] text-[var(--admin-text-muted)] space-y-1 list-disc pl-4">
                 <li>
                   Verify all 4 corners of the government ID are clearly visible
                   and uncropped.
                 </li>
                 <li>
                   Confirm legal name on ID matches the applicant profile name:{" "}
-                  <strong className="text-foreground">
+                  <strong className="text-[var(--admin-text)]">
                     {verification.applicant_name || verification.email}
                   </strong>
                   .
@@ -997,12 +997,12 @@ export default function KycApplicationDetails() {
               </span>
             </div>
 
-            <p className="text-xs text-muted-foreground leading-relaxed">
+            <p className="text-xs text-[var(--admin-text-muted)] leading-relaxed">
               Approving this application will grant verified status. The user
               will immediately be permitted to:
             </p>
 
-            <ul className="text-xs text-muted-foreground space-y-1 list-disc pl-5">
+            <ul className="text-xs text-[var(--admin-text-muted)] space-y-1 list-disc pl-5">
               {isVendor ? (
                 <>
                   <li>Publish and activate product listings on Payernt.</li>
@@ -1018,12 +1018,12 @@ export default function KycApplicationDetails() {
               )}
             </ul>
 
-            <div className="pt-3 border-t border-border/80 flex items-center justify-end gap-2">
+            <div className="pt-3 border-t border-[var(--admin-border)] flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setIsApproveOpen(false)}
                 disabled={submittingAction}
-                className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-secondary hover:bg-secondary/80 text-foreground transition-colors cursor-pointer"
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-[var(--admin-elevated)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -1068,7 +1068,7 @@ export default function KycApplicationDetails() {
 
             {/* Quick Template Chips */}
             <div className="space-y-1.5">
-              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">
+              <span className="text-[11px] font-bold text-[var(--admin-text-muted)] block">
                 Quick Reason Templates:
               </span>
               <div className="flex flex-wrap gap-1.5">
@@ -1077,7 +1077,7 @@ export default function KycApplicationDetails() {
                     key={idx}
                     type="button"
                     onClick={() => setActionReason(tmpl)}
-                    className="text-[11px] px-2.5 py-1 rounded-lg bg-secondary/80 hover:bg-secondary text-muted-foreground hover:text-foreground border border-border/60 transition-colors text-left cursor-pointer"
+                    className="text-[11px] px-2.5 py-1 rounded-lg bg-[var(--admin-elevated)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] border border-[var(--admin-border)] transition-colors text-left cursor-pointer"
                   >
                     {tmpl}
                   </button>
@@ -1087,24 +1087,24 @@ export default function KycApplicationDetails() {
 
             {/* Textarea */}
             <div className="space-y-1">
-              <label className="text-xs font-bold text-foreground">
+              <label className="text-xs font-bold text-[var(--admin-text)]">
                 Rejection Reason <span className="text-rose-500">*</span>
               </label>
               <textarea
                 rows={3}
-                placeholder="Explain clearly why this KYC document was rejected..."
+                placeholder="Explain clearly why this KYC document was rejected"
                 value={actionReason}
                 onChange={(e) => setActionReason(e.target.value)}
-                className="w-full p-3 rounded-xl text-xs bg-secondary/40 border border-border/80 text-foreground placeholder:text-muted-foreground/60 focus:outline-hidden focus:ring-2 focus:ring-rose-500/30 transition-all resize-none"
+                className="w-full p-3 rounded-xl text-xs bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] placeholder:text-[var(--admin-text-muted)] focus:outline-hidden focus:ring-2 focus:ring-rose-500/30 transition-colors resize-none"
               />
             </div>
 
-            <div className="pt-3 border-t border-border/80 flex items-center justify-end gap-2">
+            <div className="pt-3 border-t border-[var(--admin-border)] flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setIsRejectOpen(false)}
                 disabled={submittingAction}
-                className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-secondary hover:bg-secondary/80 text-foreground transition-colors cursor-pointer"
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-[var(--admin-elevated)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -1145,7 +1145,7 @@ export default function KycApplicationDetails() {
 
             {/* Quick Template Chips */}
             <div className="space-y-1.5">
-              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">
+              <span className="text-[11px] font-bold text-[var(--admin-text-muted)] block">
                 Quick Request Templates:
               </span>
               <div className="flex flex-wrap gap-1.5">
@@ -1154,7 +1154,7 @@ export default function KycApplicationDetails() {
                     key={idx}
                     type="button"
                     onClick={() => setActionReason(tmpl)}
-                    className="text-[11px] px-2.5 py-1 rounded-lg bg-secondary/80 hover:bg-secondary text-muted-foreground hover:text-foreground border border-border/60 transition-colors text-left cursor-pointer"
+                    className="text-[11px] px-2.5 py-1 rounded-lg bg-[var(--admin-elevated)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] border border-[var(--admin-border)] transition-colors text-left cursor-pointer"
                   >
                     {tmpl}
                   </button>
@@ -1164,25 +1164,25 @@ export default function KycApplicationDetails() {
 
             {/* Textarea */}
             <div className="space-y-1">
-              <label className="text-xs font-bold text-foreground">
+              <label className="text-xs font-bold text-[var(--admin-text)]">
                 Requested Information Details{" "}
                 <span className="text-amber-500">*</span>
               </label>
               <textarea
                 rows={3}
-                placeholder="Explain what needs to be corrected or re-uploaded..."
+                placeholder="Explain what needs to be corrected or re-uploaded"
                 value={actionReason}
                 onChange={(e) => setActionReason(e.target.value)}
-                className="w-full p-3 rounded-xl text-xs bg-secondary/40 border border-border/80 text-foreground placeholder:text-muted-foreground/60 focus:outline-hidden focus:ring-2 focus:ring-amber-500/30 transition-all resize-none"
+                className="w-full p-3 rounded-xl text-xs bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] placeholder:text-[var(--admin-text-muted)] focus:outline-hidden focus:ring-2 focus:ring-amber-500/30 transition-colors resize-none"
               />
             </div>
 
-            <div className="pt-3 border-t border-border/80 flex items-center justify-end gap-2">
+            <div className="pt-3 border-t border-[var(--admin-border)] flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setIsRequestInfoOpen(false)}
                 disabled={submittingAction}
-                className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-secondary hover:bg-secondary/80 text-foreground transition-colors cursor-pointer"
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-[var(--admin-elevated)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] transition-colors cursor-pointer"
               >
                 Cancel
               </button>

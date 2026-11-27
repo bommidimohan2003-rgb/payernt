@@ -12,7 +12,7 @@ import {
   MessageSquare,
   AlertCircle,
   ShieldAlert,
-  Sparkles,
+  BookOpen,
 } from "lucide-react";
 import { notificationsService } from "../services/notifications";
 import { suggestKnowledgeFromTicket } from "../services/knowledge";
@@ -153,10 +153,10 @@ export default function Support() {
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-border/50">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#F5F5F5]">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--admin-text)]">
             Support
           </h1>
-          <p className="text-xs text-[#A1A1AA] mt-0.5 font-medium">
+          <p className="text-xs text-[var(--admin-text-muted)] mt-0.5 font-medium">
             Manage user support tickets.
           </p>
         </div>
@@ -165,27 +165,19 @@ export default function Support() {
           <button
             onClick={() => fetchTickets()}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[rgba(161,161,170,0.18)] bg-[#10151B] hover:bg-[#171C23] text-[#F5F5F5] text-xs font-medium transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs font-medium transition-colors cursor-pointer"
             title="Refresh tickets"
           >
-            <RefreshCw className={cn("h-3.5 w-3.5 text-[#A1A1AA]", loading && "animate-spin")} />
+            <RefreshCw className={cn("h-3.5 w-3.5 text-[var(--admin-text-muted)]", loading && "animate-spin")} />
             <span>Refresh</span>
           </button>
 
-          <button
-            onClick={() => {
-              toast.info("Ticket creator initiated.");
-            }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-neutral-200 text-black font-semibold text-xs transition-colors cursor-pointer"
-          >
-            <LifeBuoy className="h-3.5 w-3.5" />
-            <span>New Ticket</span>
-          </button>
+
         </div>
       </div>
 
       {/* TABS (Panel 12): All Tickets | Open | In Progress | Resolved */}
-      <div className="flex items-center gap-2 border-b border-[rgba(161,161,170,0.18)] pb-2 overflow-x-auto no-scrollbar">
+      <div className="flex items-center gap-2 border-b border-[var(--admin-border)] pb-2 overflow-x-auto no-scrollbar">
         {[
           { id: "all", label: "All Tickets", count: tabCounts.all },
           { id: "open", label: "Open", count: tabCounts.open },
@@ -196,17 +188,17 @@ export default function Support() {
             key={tab.id}
             onClick={() => setStatusFilter(tab.id)}
             className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer flex items-center gap-2",
+              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap cursor-pointer flex items-center gap-2",
               statusFilter === tab.id
-                ? "bg-white text-black font-semibold shadow-xs"
-                : "text-[#A1A1AA] hover:text-[#F5F5F5] hover:bg-white/5 border border-transparent"
+                ? "bg-[var(--admin-accent)] text-[var(--admin-bg)] font-semibold shadow-xs"
+                : "text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-elevated)] border border-transparent"
             )}
           >
             <span>{tab.label}</span>
             <span
               className={cn(
-                "px-1.5 py-0.5 rounded-full text-[10px] font-mono",
-                statusFilter === tab.id ? "bg-black/15 text-black font-bold" : "bg-white/10 text-[#A1A1AA]"
+                "px-1.5 py-0.5 rounded-full text-[11px] font-mono",
+                statusFilter === tab.id ? "bg-white/20 dark:bg-black/15 text-[var(--admin-bg)] font-medium" : "bg-[var(--admin-elevated)] text-[var(--admin-text-muted)]"
               )}
             >
               {tab.count}
@@ -216,15 +208,15 @@ export default function Support() {
       </div>
 
       {/* FILTERS & SEARCH */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#10151B] p-3 rounded-xl border border-[rgba(161,161,170,0.18)]">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[var(--admin-card)] p-3 rounded-xl border border-[var(--admin-border)]">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#A1A1AA]" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--admin-text-muted)]" />
           <input
             type="text"
-            placeholder="Search tickets by user, subject..."
+            placeholder="Search tickets by user or subject"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[#050709] text-[#F5F5F5] text-xs rounded-lg pl-9 pr-3 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none focus:border-white/40 font-medium placeholder:text-[#A1A1AA]"
+            className="w-full bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-lg pl-9 pr-3 py-2 border border-[var(--admin-border)] focus:outline-none focus:border-[var(--admin-text)]/40 font-medium placeholder:text-[var(--admin-text-muted)]"
           />
         </div>
 
@@ -232,7 +224,7 @@ export default function Support() {
           <select
             value={priorityFilter}
             onChange={(e) => setPriorityFilter(e.target.value)}
-            className="bg-[#050709] text-[#F5F5F5] text-xs rounded-lg px-2.5 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none font-medium cursor-pointer"
+            className="bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-lg px-2.5 py-2 border border-[var(--admin-border)] focus:outline-none font-medium cursor-pointer"
           >
             <option value="all">All Priority</option>
             <option value="high">High</option>
@@ -243,7 +235,7 @@ export default function Support() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-[#050709] text-[#F5F5F5] text-xs rounded-lg px-2.5 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none font-medium cursor-pointer"
+            className="bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-lg px-2.5 py-2 border border-[var(--admin-border)] focus:outline-none font-medium cursor-pointer"
           >
             <option value="all">All Status</option>
             <option value="open">Open</option>
@@ -255,17 +247,17 @@ export default function Support() {
 
       {/* ERROR / UNCONFIGURED BANNER */}
       {error && !loading && (
-        <div className="bg-[#10151B] rounded-xl border border-red-500/20 p-8 text-center flex flex-col items-center justify-center space-y-3">
+        <div className="bg-[var(--admin-card)] rounded-xl border border-red-500/20 p-8 text-center flex flex-col items-center justify-center space-y-3">
           <div className="w-10 h-10 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center">
             <ShieldAlert className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-[#F5F5F5]">Database Sync Failed</h3>
-            <p className="text-xs text-[#A1A1AA] mt-1 max-w-sm">{error}</p>
+            <h3 className="text-sm font-semibold text-[var(--admin-text)]">Database Sync Failed</h3>
+            <p className="text-xs text-[var(--admin-text-muted)] mt-1 max-w-sm">{error}</p>
           </div>
           <button
             onClick={() => fetchTickets()}
-            className="px-4 py-2 rounded-lg bg-[#171C23] hover:bg-[#171C23]/80 text-[#F5F5F5] text-xs font-medium transition-colors border border-[rgba(161,161,170,0.18)] cursor-pointer"
+            className="px-4 py-2 rounded-lg bg-[var(--admin-elevated)] hover:bg-[var(--admin-elevated)]/80 text-[var(--admin-text)] text-xs font-medium transition-colors border border-[var(--admin-border)] cursor-pointer"
           >
             Retry Database Fetch
           </button>
@@ -275,15 +267,15 @@ export default function Support() {
       {/* TICKETS WORKSPACE */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* TICKET LIST PANEL (TABLE/CARDS) */}
-        <div className="bg-[#10151B] rounded-xl border border-[rgba(161,161,170,0.18)] overflow-hidden flex flex-col h-[650px]">
-          <div className="p-3 border-b border-[rgba(161,161,170,0.18)] bg-[#0B1015] flex items-center justify-between text-xs font-bold text-[#F5F5F5]">
+        <div className="bg-[var(--admin-card)] rounded-xl border border-[var(--admin-border)] overflow-hidden flex flex-col h-[40rem]">
+          <div className="p-3 border-b border-[var(--admin-border)] bg-[var(--admin-sidebar)] flex items-center justify-between text-xs font-bold text-[var(--admin-text)]">
             <span>Ticket Queue ({filteredTickets.length})</span>
-            <span className="text-[11px] font-mono text-[#A1A1AA]">Real-time Sync</span>
+            <span className="text-[11px] font-mono text-[var(--admin-text-muted)]">Real-time Sync</span>
           </div>
 
           <div className="flex-1 overflow-y-auto divide-y divide-[rgba(161,161,170,0.1)]">
             {filteredTickets.length === 0 ? (
-              <div className="py-16 text-center text-xs text-[#A1A1AA]">
+              <div className="py-16 text-center text-xs text-[var(--admin-text-muted)]">
                 No tickets match criteria.
               </div>
             ) : (
@@ -309,33 +301,33 @@ export default function Support() {
                     )}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-[#F5F5F5] truncate max-w-[180px]">{t.subject}</span>
+                      <span className="font-semibold text-[var(--admin-text)] truncate max-w-45">{t.subject}</span>
                       <span
                         className={cn(
-                          "text-[9px] font-mono font-medium uppercase px-1.5 py-0.5 rounded border",
+                          "text-[11px] font-mono font-medium  px-1.5 py-0.5 rounded border",
                           t.status === "open"
                             ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
                             : t.status === "resolved"
                             ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                            : "bg-[#171C23] text-[#A1A1AA] border-[rgba(161,161,170,0.18)]"
+                            : "bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] border-[var(--admin-border)]"
                         )}
                       >
                         {t.status}
                       </span>
                     </div>
 
-                    <p className="text-[11px] text-[#A1A1AA] truncate">
+                    <p className="text-[11px] text-[var(--admin-text-muted)] truncate">
                       {t.userName} ({t.userEmail})
                     </p>
 
                     {preview && (
                       <p className="text-[11px] text-[#D4D4D8] truncate font-medium">
-                        <span className="text-[#71717A]">Preview: </span>
+                        <span className="text-[var(--admin-text-muted)]">Preview: </span>
                         "{preview}"
                       </p>
                     )}
 
-                    <div className="flex items-center justify-between text-[10px] text-[#A1A1AA] font-mono">
+                    <div className="flex items-center justify-between text-[11px] text-[var(--admin-text-muted)] font-mono">
                       <span>{t.category || "General"}</span>
                       <span>{t.createdAt ? new Date(t.createdAt).toLocaleDateString() : "Recent"}</span>
                     </div>
@@ -347,7 +339,7 @@ export default function Support() {
         </div>
 
         {/* TICKET CONVERSATION THREAD */}
-        <div className="lg:col-span-2 bg-[#10151B] rounded-xl border border-[rgba(161,161,170,0.18)] flex flex-col h-[650px] overflow-hidden">
+        <div className="lg:col-span-2 bg-[var(--admin-card)] rounded-xl border border-[var(--admin-border)] flex flex-col h-[40rem] overflow-hidden">
           {selectedTicket ? (
             (() => {
               const firstMsg =
@@ -381,24 +373,24 @@ export default function Support() {
               return (
                 <>
                   {/* Thread Header */}
-                  <div className="p-4 border-b border-[rgba(161,161,170,0.18)] bg-[#0B1015] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="p-4 border-b border-[var(--admin-border)] bg-[var(--admin-sidebar)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-sm font-bold text-[#F5F5F5]">{selectedTicket.subject}</h3>
-                        <span className="font-mono text-[10px] text-[#A1A1AA] bg-white/5 px-2 py-0.5 rounded border border-[rgba(161,161,170,0.18)]">
+                        <h3 className="text-sm font-bold text-[var(--admin-text)]">{selectedTicket.subject}</h3>
+                        <span className="font-mono text-[11px] text-[var(--admin-text-muted)] bg-[var(--admin-elevated)] px-2 py-0.5 rounded border border-[var(--admin-border)]">
                           #{selectedTicket.id}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-[#A1A1AA] mt-1 flex-wrap">
+                      <div className="flex items-center gap-2 text-xs text-[var(--admin-text-muted)] mt-1 flex-wrap">
                         <span>
-                          Requester: <strong className="font-medium text-[#F5F5F5]">{selectedTicket.userName}</strong>
+                          Requester: <strong className="font-medium text-[var(--admin-text)]">{selectedTicket.userName}</strong>
                         </span>
                         <span>•</span>
                         <span>{selectedTicket.userEmail}</span>
                         <span>•</span>
                         <span>{selectedTicket.category || "General Help"}</span>
                         <span>•</span>
-                        <span>Priority: <strong className="uppercase text-amber-400">{selectedTicket.priority || "medium"}</strong></span>
+                        <span>Priority: <strong className="text-amber-400">{selectedTicket.priority || "medium"}</strong></span>
                         <span>•</span>
                         <span>{selectedTicket.createdAt ? new Date(selectedTicket.createdAt).toLocaleString() : "Recent"}</span>
                       </div>
@@ -413,14 +405,14 @@ export default function Support() {
                           title="Suggest this resolved support thread as a draft knowledge article"
                           className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
                         >
-                          <Sparkles className="h-3.5 w-3.5" />
+                          <BookOpen className="h-3.5 w-3.5" />
                           <span>{suggestingKnowledge ? "Suggesting..." : "Suggest as Knowledge"}</span>
                         </button>
                       )}
                       <select
                         value={selectedTicket.status}
                         onChange={(e) => handleUpdateStatus(e.target.value as AdminSupportTicket["status"])}
-                        className="bg-[#050709] text-[#F5F5F5] text-xs rounded-lg px-2.5 py-1.5 border border-[rgba(161,161,170,0.18)] font-medium uppercase cursor-pointer"
+                        className="bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-lg px-2.5 py-1.5 border border-[var(--admin-border)] font-medium cursor-pointer"
                       >
                         <option value="open">Open</option>
                         <option value="pending">In Progress</option>
@@ -431,35 +423,35 @@ export default function Support() {
                   </div>
 
                   {/* Dedicated Original Inquiry & Conversation Context Panel */}
-                  <div className="p-3 border-b border-[rgba(161,161,170,0.1)] bg-[#0E1318] space-y-2.5">
+                  <div className="p-3 border-b border-[var(--admin-border)] bg-[var(--admin-elevated)]/60 space-y-2.5">
                     {originalInquiryText ? (
-                      <div className="p-3 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] space-y-1">
-                        <div className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-bold flex items-center gap-1.5">
+                      <div className="p-3 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] space-y-1">
+                        <div className="text-[11px] font-mono text-emerald-400 font-bold flex items-center gap-1.5">
                           <LifeBuoy className="h-3.5 w-3.5" />
                           <span>Original User Inquiry</span>
                         </div>
-                        <p className="text-xs text-[#F5F5F5] font-medium leading-relaxed whitespace-pre-wrap">
+                        <p className="text-xs text-[var(--admin-text)] font-medium leading-relaxed whitespace-pre-wrap">
                           "{originalInquiryText}"
                         </p>
                       </div>
                     ) : (
-                      <div className="p-2.5 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-xs text-[#71717A] italic">
+                      <div className="p-2.5 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-xs text-[var(--admin-text-muted)]">
                         Original inquiry description is unavailable for this ticket.
                       </div>
                     )}
 
                     {contextItems.length > 0 && (
-                      <div className="p-3 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] space-y-1.5">
-                        <div className="text-[10px] font-mono uppercase tracking-wider text-[#A1A1AA] font-bold">
+                      <div className="p-3 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] space-y-1.5">
+                        <div className="text-[11px] font-mono text-[var(--admin-text-muted)] font-bold">
                           Conversation Context
                         </div>
-                        <div className="space-y-1.5 border-l-2 border-[rgba(161,161,170,0.2)] pl-2.5">
+                        <div className="space-y-1.5 border-l-2 border-[var(--admin-border)] pl-2.5">
                           {contextItems.map((c, idx) => (
                             <div key={idx} className="text-xs space-y-0.5">
-                              <span className="font-semibold text-[#A1A1AA] text-[10px] uppercase font-mono">
+                              <span className="font-semibold text-[var(--admin-text-muted)] text-[11px] font-mono">
                                 {c.sender}:
                               </span>
-                              <p className="text-[#E4E4E7] whitespace-pre-wrap">{c.text}</p>
+                              <p className="text-[var(--admin-text)] whitespace-pre-wrap">{c.text}</p>
                             </div>
                           ))}
                         </div>
@@ -484,7 +476,7 @@ export default function Support() {
                                 : "bg-secondary/40 border border-border/50 text-foreground"
                             )}
                           >
-                            <div className="flex items-center justify-between text-[10px] font-medium opacity-75">
+                            <div className="flex items-center justify-between text-[11px] font-medium opacity-75">
                               <span>{!isUserSender ? "Support Admin" : selectedTicket.userName}</span>
                               <span>
                                 {msgTime
@@ -494,32 +486,32 @@ export default function Support() {
                             </div>
                             <p className="whitespace-pre-wrap">
                               {msgContent || (
-                                <span className="italic text-[#71717A]">No description content recorded.</span>
+                                <span className="text-[var(--admin-text-muted)]">No description content recorded.</span>
                               )}
                             </p>
                           </div>
                         );
                       })
                     ) : (
-                      <div className="py-12 text-center text-xs text-muted-foreground">
+                      <div className="py-12 text-center text-xs text-[var(--admin-text-muted)]">
                         No replies sent yet in this ticket thread.
                       </div>
                     )}
                   </div>
 
                   {/* Reply Form */}
-                  <form onSubmit={handleSendReply} className="p-3 border-t border-[rgba(161,161,170,0.18)] bg-[#0B1015] flex gap-2">
+                  <form onSubmit={handleSendReply} className="p-3 border-t border-[var(--admin-border)] bg-[var(--admin-sidebar)] flex gap-2">
                     <input
                       type="text"
-                      placeholder="Type an official admin response..."
+                      placeholder="Write a response to the customer"
                       value={reply}
                       onChange={(e) => setReply(e.target.value)}
-                      className="flex-1 px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs font-medium focus:outline-none focus:border-white/40 placeholder:text-[#A1A1AA]"
+                      className="flex-1 px-3 py-2 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs font-medium focus:outline-none focus:border-[var(--admin-text)]/40 placeholder:text-[var(--admin-text-muted)]"
                     />
                     <button
                       type="submit"
                       disabled={submittingReply || !reply.trim()}
-                      className="px-3.5 py-2 rounded-lg bg-white hover:bg-neutral-200 text-black font-semibold text-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                      className="px-3.5 py-2 rounded-lg bg-[var(--admin-accent)] hover:bg-[var(--admin-accent-hover)] text-[var(--admin-bg)] font-semibold text-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
                     >
                       <Send className="h-3.5 w-3.5" />
                       <span>Send</span>
@@ -529,7 +521,7 @@ export default function Support() {
               );
             })()
           ) : (
-            <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+            <div className="h-full flex items-center justify-center text-xs text-[var(--admin-text-muted)]">
               Select a ticket to view thread history.
             </div>
           )}

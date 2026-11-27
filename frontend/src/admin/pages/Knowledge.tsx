@@ -17,7 +17,6 @@ import {
   DownloadCloud,
   History,
   RotateCcw,
-  Sparkles,
   ShieldCheck,
   FileText,
   HelpCircle,
@@ -30,6 +29,8 @@ import { Table, Column } from "../components/layout/Table";
 import { Pagination } from "../components/layout/Pagination";
 import { StatsCard } from "../components/layout/StatsCard";
 import { Modal } from "../components/layout/Modal";
+import { ConfirmDialog } from "../components/layout/ConfirmDialog";
+import { PayentAgentIcon } from "@/components/common/PayentAgentIcon";
 import {
   KnowledgeEntry,
   KnowledgeVersion,
@@ -110,9 +111,9 @@ function MarkdownPreview({ content }: { content: string }) {
   const lines = content.split("\n");
 
   return (
-    <div className="space-y-2 text-xs leading-relaxed text-[#F5F5F5] font-sans">
+    <div className="space-y-2 text-xs leading-relaxed text-[var(--admin-text)] font-sans">
       {hasVerifyMarker && (
-        <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2 mb-3">
+        <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[var(--admin-warning)] text-xs flex items-center gap-2 mb-3">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           <span>
             <strong>Policy Placeholder:</strong> Contains <code>{verifyMarkers.join(", ")}</code>. Must be replaced before publication.
@@ -123,21 +124,21 @@ function MarkdownPreview({ content }: { content: string }) {
         if (!line.trim()) return <div key={idx} className="h-1.5" />;
         if (line.startsWith("### ")) {
           return (
-            <h4 key={idx} className="font-bold text-sm text-[#F5F5F5] mt-2">
+            <h4 key={idx} className="font-bold text-sm text-[var(--admin-text)] mt-2">
               {line.slice(4)}
             </h4>
           );
         }
         if (line.startsWith("## ")) {
           return (
-            <h3 key={idx} className="font-bold text-base text-[#F5F5F5] mt-3">
+            <h3 key={idx} className="font-bold text-base text-[var(--admin-text)] mt-3">
               {line.slice(3)}
             </h3>
           );
         }
         if (line.startsWith("# ")) {
           return (
-            <h2 key={idx} className="font-bold text-lg text-[#F5F5F5] mt-3">
+            <h2 key={idx} className="font-bold text-lg text-[var(--admin-text)] mt-3">
               {line.slice(2)}
             </h2>
           );
@@ -145,7 +146,7 @@ function MarkdownPreview({ content }: { content: string }) {
         if (line.startsWith("- ") || line.startsWith("* ")) {
           return (
             <div key={idx} className="flex items-start gap-2 pl-2">
-              <span className="text-[#A1A1AA]">•</span>
+              <span className="text-[var(--admin-text-muted)]">•</span>
               <span>{renderInlineMarkdown(line.slice(2))}</span>
             </div>
           );
@@ -154,7 +155,7 @@ function MarkdownPreview({ content }: { content: string }) {
         if (numMatch) {
           return (
             <div key={idx} className="flex items-start gap-2 pl-2">
-              <span className="text-[#A1A1AA] font-mono text-[10px]">{numMatch[1]}.</span>
+              <span className="text-[var(--admin-text-muted)] font-mono text-[11px]">{numMatch[1]}.</span>
               <span>{renderInlineMarkdown(numMatch[2])}</span>
             </div>
           );
@@ -180,7 +181,7 @@ function renderInlineMarkdown(text: string): React.ReactNode {
       return (
         <span
           key={pIdx}
-          className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[10px] border border-amber-500/40 inline-block my-0.5"
+          className="px-1.5 py-0.5 rounded bg-amber-500/20 text-[var(--admin-warning)] font-mono text-[11px] border border-amber-500/40 inline-block my-0.5"
         >
           {part}
         </span>
@@ -247,6 +248,7 @@ export default function Knowledge() {
   const [versions, setVersions] = useState<KnowledgeVersion[]>([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [rollingBack, setRollingBack] = useState(false);
+  const [rollbackVersionTarget, setRollbackVersionTarget] = useState<number | null>(null);
 
   // Draft review modal state
   const [draftModalOpen, setDraftModalOpen] = useState(false);
@@ -594,15 +596,19 @@ export default function Knowledge() {
   };
 
   // Rollback Version
-  const handleRollback = async (version: number) => {
+  const handleRollback = (version: number) => {
     if (!historyEntry) return;
-    if (!confirm(`Are you sure you want to rollback "${historyEntry.id}" to version ${version}? A new version will be created.`)) {
-      return;
-    }
+    setRollbackVersionTarget(version);
+  };
+
+  const executeRollback = async () => {
+    if (!historyEntry || rollbackVersionTarget === null) return;
+    const version = rollbackVersionTarget;
     try {
       setRollingBack(true);
       await rollbackKnowledgeVersion(historyEntry.id, version, `Rollback to version ${version}`);
-      toast.success(`Rolled back "${historyEntry.id}" to version ${version}!`);
+      toast.success(`Rolled back "${historyEntry.id}" to version ${version}.`);
+      setRollbackVersionTarget(null);
       setHistoryOpen(false);
       loadEntries();
       loadStats();
@@ -714,12 +720,12 @@ export default function Knowledge() {
       label: "Entry",
       render: (row) => (
         <div className="space-y-0.5">
-          <span className="font-mono text-xs font-bold text-[#F5F5F5]">{row.id}</span>
+          <span className="font-mono text-xs font-bold text-[var(--admin-text)]">{row.id}</span>
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#171C23] text-[#A1A1AA] border border-[rgba(161,161,170,0.18)]">
+            <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] border border-[var(--admin-border)]">
               {row.category}
             </span>
-            <span className="text-[10px] font-mono text-muted-foreground">v{row.version}</span>
+            <span className="text-[11px] font-mono text-[var(--admin-text-muted)]">v{row.version}</span>
           </div>
         </div>
       ),
@@ -732,10 +738,10 @@ export default function Knowledge() {
         const hasMarker = row.has_verify_marker || markers.length > 0;
         return (
           <div className="space-y-1 max-w-md">
-            <p className="text-xs font-semibold text-[#F5F5F5] line-clamp-1">{row.canonical_question}</p>
-            <p className="text-[11px] text-[#A1A1AA] line-clamp-2">{row.answer_markdown}</p>
+            <p className="text-xs font-semibold text-[var(--admin-text)] line-clamp-1">{row.canonical_question}</p>
+            <p className="text-[11px] text-[var(--admin-text-muted)] line-clamp-2">{row.answer_markdown}</p>
             {hasMarker && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono">
+              <span className="inline-flex items-center gap-1 text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono">
                 <AlertTriangle className="h-3 w-3" />
                 {markers[0] || "[VERIFY]"}
               </span>
@@ -750,11 +756,11 @@ export default function Knowledge() {
       render: (row) => (
         <span
           className={cn(
-            "text-[10px] font-mono font-medium px-2 py-0.5 rounded border uppercase",
+            "text-[11px] font-mono font-medium px-2 py-0.5 rounded border",
             row.retrieval_type === "GUIDE"
-              ? "bg-blue-500/10 text-blue-400 border-blue-500/30"
+              ? "bg-[var(--admin-elevated)] text-[var(--admin-text-secondary)] border-[var(--admin-border)]"
               : row.retrieval_type === "LIVE_DB"
-              ? "bg-purple-500/10 text-purple-400 border-purple-500/30"
+              ? "bg-[var(--admin-elevated)] text-[var(--admin-text)] border-[var(--admin-border)]"
               : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
           )}
         >
@@ -770,7 +776,7 @@ export default function Knowledge() {
           <div>
             <span
               className={cn(
-                "text-[10px] font-mono font-medium px-2 py-0.5 rounded border uppercase",
+                "text-[11px] font-mono font-medium px-2 py-0.5 rounded border",
                 row.status === "published"
                   ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
                   : row.status === "pending_review"
@@ -783,11 +789,11 @@ export default function Knowledge() {
           </div>
           <div>
             {row.is_verified ? (
-              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
+              <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
                 <ShieldCheck className="h-3 w-3" /> Verified
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 font-medium">
+              <span className="inline-flex items-center gap-1 text-[11px] text-amber-400 font-medium">
                 <AlertTriangle className="h-3 w-3" /> Unverified
               </span>
             )}
@@ -807,7 +813,7 @@ export default function Knowledge() {
             <button
               onClick={() => handleOpenEditor(row)}
               title="Edit Entry"
-              className="p-1.5 rounded-lg bg-[#171C23] hover:bg-neutral-800 text-[#F5F5F5] border border-[rgba(161,161,170,0.18)] transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg bg-[var(--admin-elevated)] hover:bg-[var(--admin-card)] text-[var(--admin-text)] border border-[var(--admin-border)] transition-colors cursor-pointer"
             >
               <Edit3 className="h-3.5 w-3.5" />
             </button>
@@ -860,7 +866,7 @@ export default function Knowledge() {
           <button
             onClick={() => handleOpenHistory(row)}
             title="Version History & Rollback"
-            className="p-1.5 rounded-lg bg-[#171C23] hover:bg-neutral-800 text-[#A1A1AA] hover:text-[#F5F5F5] border border-[rgba(161,161,170,0.18)] transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg bg-[var(--admin-elevated)] hover:bg-[var(--admin-card)] text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] border border-[var(--admin-border)] transition-colors cursor-pointer"
           >
             <History className="h-3.5 w-3.5" />
           </button>
@@ -875,11 +881,11 @@ export default function Knowledge() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-[#F5F5F5] flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-emerald-400" />
+          <h1 className="text-xl font-bold text-[var(--admin-text)] flex items-center gap-2">
+            <PayentAgentIcon size={22} className="text-emerald-500" />
             Agent Knowledge & Retrieval Manager
           </h1>
-          <p className="text-xs text-[#A1A1AA] mt-1">
+          <p className="text-xs text-[var(--admin-text-muted)] mt-1">
             Deterministic Q&A knowledge base, editorial approval lifecycle, and in-memory TF-IDF index
           </p>
         </div>
@@ -898,7 +904,7 @@ export default function Knowledge() {
               loadEntries();
               loadIndexHealth();
             }}
-            className="p-2 rounded-lg bg-[#10151B] hover:bg-[#171C23] text-[#A1A1AA] hover:text-[#F5F5F5] border border-[rgba(161,161,170,0.18)] transition-colors cursor-pointer"
+            className="p-2 rounded-lg bg-[var(--admin-card)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] border border-[var(--admin-border)] transition-colors cursor-pointer"
             title="Refresh All Data"
           >
             <RefreshCw className="h-4 w-4" />
@@ -951,14 +957,14 @@ export default function Knowledge() {
       </div>
 
       {/* Tabs navigation */}
-      <div className="flex border-b border-[rgba(161,161,170,0.18)] gap-2">
+      <div className="flex border-b border-[var(--admin-border)] gap-2">
         <button
           onClick={() => setActiveTab("articles")}
           className={cn(
             "pb-3 px-4 text-xs font-semibold transition-colors border-b-2 flex items-center gap-2 cursor-pointer",
             activeTab === "articles"
-              ? "border-emerald-400 text-[#F5F5F5]"
-              : "border-transparent text-[#A1A1AA] hover:text-[#F5F5F5]"
+              ? "border-emerald-400 text-[var(--admin-text)]"
+              : "border-transparent text-[var(--admin-text-muted)] hover:text-[var(--admin-text)]"
           )}
         >
           <BookOpen className="h-3.5 w-3.5" />
@@ -969,8 +975,8 @@ export default function Knowledge() {
           className={cn(
             "pb-3 px-4 text-xs font-semibold transition-colors border-b-2 flex items-center gap-2 cursor-pointer",
             activeTab === "drafts"
-              ? "border-emerald-400 text-[#F5F5F5]"
-              : "border-transparent text-[#A1A1AA] hover:text-[#F5F5F5]"
+              ? "border-emerald-400 text-[var(--admin-text)]"
+              : "border-transparent text-[var(--admin-text-muted)] hover:text-[var(--admin-text)]"
           )}
         >
           <Lightbulb className="h-3.5 w-3.5" />
@@ -981,8 +987,8 @@ export default function Knowledge() {
           className={cn(
             "pb-3 px-4 text-xs font-semibold transition-colors border-b-2 flex items-center gap-2 cursor-pointer",
             activeTab === "index"
-              ? "border-emerald-400 text-[#F5F5F5]"
-              : "border-transparent text-[#A1A1AA] hover:text-[#F5F5F5]"
+              ? "border-emerald-400 text-[var(--admin-text)]"
+              : "border-transparent text-[var(--admin-text-muted)] hover:text-[var(--admin-text)]"
           )}
         >
           <Database className="h-3.5 w-3.5" />
@@ -994,18 +1000,18 @@ export default function Knowledge() {
       {activeTab === "articles" && (
         <div className="space-y-4">
           {/* Filters Bar */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-[#10151B] p-3 rounded-xl border border-[rgba(161,161,170,0.18)]">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-[var(--admin-card)] p-3 rounded-xl border border-[var(--admin-border)]">
             <div className="md:col-span-2 relative">
-              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-[#A1A1AA]" />
+              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-[var(--admin-text-muted)]" />
               <input
                 type="text"
-                placeholder="Search question, answer, or synonyms..."
+                placeholder="Search question, answer, or synonyms"
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs focus:outline-none focus:border-emerald-400"
+                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs focus:outline-none focus:border-emerald-400"
               />
             </div>
 
@@ -1016,7 +1022,7 @@ export default function Knowledge() {
                 setCategoryFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="px-2.5 py-1.5 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs cursor-pointer font-medium"
+              className="px-2.5 py-1.5 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs cursor-pointer font-medium"
             >
               <option value="all">All Categories</option>
               {categoryFilter !== "all" && !ALL_KNOWLEDGE_CATEGORIES.includes(categoryFilter as any) && (
@@ -1045,7 +1051,7 @@ export default function Knowledge() {
                 setStatusFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="px-2.5 py-1.5 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs cursor-pointer font-medium"
+              className="px-2.5 py-1.5 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs cursor-pointer font-medium"
             >
               <option value="all">All Statuses</option>
               <option value="published">Published</option>
@@ -1061,7 +1067,7 @@ export default function Knowledge() {
                 setVerificationFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="px-2.5 py-1.5 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs cursor-pointer font-medium"
+              className="px-2.5 py-1.5 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs cursor-pointer font-medium"
             >
               <option value="all">All Verification</option>
               <option value="verified">Verified Only</option>
@@ -1090,16 +1096,16 @@ export default function Knowledge() {
       {/* TAB 2: DRAFT SUGGESTIONS */}
       {activeTab === "drafts" && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between bg-[#10151B] p-3 rounded-xl border border-[rgba(161,161,170,0.18)]">
+          <div className="flex items-center justify-between bg-[var(--admin-card)] p-3 rounded-xl border border-[var(--admin-border)]">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-[#A1A1AA]">Status:</span>
+              <span className="text-xs font-semibold text-[var(--admin-text-muted)]">Status:</span>
               <select
                 value={draftStatusFilter}
                 onChange={(e) => {
                   setDraftStatusFilter(e.target.value);
                   setDraftsPage(1);
                 }}
-                className="px-2.5 py-1.5 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs cursor-pointer"
+                className="px-2.5 py-1.5 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs cursor-pointer"
               >
                 <option value="all">All Drafts</option>
                 <option value="pending_review">Pending Review</option>
@@ -1110,7 +1116,7 @@ export default function Knowledge() {
             </div>
             <button
               onClick={loadDrafts}
-              className="p-1.5 rounded-lg bg-[#050709] hover:bg-neutral-800 text-[#A1A1AA] border border-[rgba(161,161,170,0.18)]"
+              className="p-1.5 rounded-lg bg-[var(--admin-elevated)] hover:bg-[var(--admin-card)] text-[var(--admin-text-muted)] border border-[var(--admin-border)]"
               title="Refresh Drafts"
             >
               <RefreshCw className="h-3.5 w-3.5" />
@@ -1118,9 +1124,9 @@ export default function Knowledge() {
           </div>
 
           {draftsLoading ? (
-            <div className="py-16 text-center text-xs text-[#A1A1AA]">Loading draft suggestions...</div>
+            <div className="py-16 text-center text-xs text-[var(--admin-text-muted)]">Loading draft suggestions...</div>
           ) : drafts.length === 0 ? (
-            <div className="py-16 text-center text-xs text-[#A1A1AA] bg-[#10151B] rounded-xl border border-[rgba(161,161,170,0.18)]">
+            <div className="py-16 text-center text-xs text-[var(--admin-text-muted)] bg-[var(--admin-card)] rounded-xl border border-[var(--admin-border)]">
               No draft suggestions found. Resolved support tickets with helpful answers can be suggested as knowledge articles.
             </div>
           ) : (
@@ -1128,23 +1134,23 @@ export default function Knowledge() {
               {drafts.map((d) => (
                 <div
                   key={d.id}
-                  className="p-4 rounded-xl bg-[#10151B] border border-[rgba(161,161,170,0.18)] space-y-3"
+                  className="p-4 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] space-y-3"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-bold text-[#F5F5F5]">{d.id}</span>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#171C23] text-[#A1A1AA] border border-[rgba(161,161,170,0.18)]">
+                      <span className="font-mono text-xs font-bold text-[var(--admin-text)]">{d.id}</span>
+                      <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] border border-[var(--admin-border)]">
                         {d.category || "GENERAL"}
                       </span>
                       {d.source_ticket_id && (
-                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/30">
+                        <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-[var(--admin-elevated)] text-[var(--admin-text-secondary)] border border-[var(--admin-border)]">
                           From Ticket #{d.source_ticket_id}
                         </span>
                       )}
                     </div>
                     <span
                       className={cn(
-                        "text-[10px] font-mono font-medium px-2 py-0.5 rounded border uppercase",
+                        "text-[11px] font-mono font-medium px-2 py-0.5 rounded border",
                         d.status === "approved"
                           ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
                           : d.status === "pending_review"
@@ -1157,16 +1163,16 @@ export default function Knowledge() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <p className="text-xs font-semibold text-[#F5F5F5]">
-                      <span className="text-[#A1A1AA]">Customer Query:</span> {d.customer_query}
+                    <p className="text-xs font-semibold text-[var(--admin-text)]">
+                      <span className="text-[var(--admin-text-muted)]">Customer Query:</span> {d.customer_query}
                     </p>
-                    <p className="text-xs text-[#A1A1AA] bg-[#050709] p-3 rounded-lg border border-[rgba(161,161,170,0.1)] leading-relaxed">
+                    <p className="text-xs text-[var(--admin-text-muted)] bg-[var(--admin-elevated)] p-3 rounded-lg border border-[var(--admin-border)] leading-relaxed">
                       {d.suggested_answer}
                     </p>
                   </div>
 
                   {d.similarity_score !== undefined && d.similarity_score > 0.5 && (
-                    <div className="p-2 rounded bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 flex items-center gap-1.5">
+                    <div className="p-2 rounded bg-amber-500/10 border border-amber-500/20 text-[11px] text-[var(--admin-warning)] flex items-center gap-1.5">
                       <AlertTriangle className="h-3.5 w-3.5" />
                       <span>
                         Potential duplicate match score: <strong>{Math.round(d.similarity_score * 100)}%</strong>
@@ -1174,15 +1180,15 @@ export default function Knowledge() {
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between pt-2 border-t border-[rgba(161,161,170,0.1)]">
-                    <span className="text-[10px] font-mono text-[#A1A1AA]">
+                  <div className="flex items-center justify-between pt-2 border-t border-[var(--admin-border)]">
+                    <span className="text-[11px] font-mono text-[var(--admin-text-muted)]">
                       Created: {new Date(d.created_at).toLocaleString()}
                     </span>
                     <button
                       onClick={() => handleOpenDraftReview(d)}
                       className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1 cursor-pointer"
                     >
-                      <Sparkles className="h-3.5 w-3.5" />
+                      <CheckCircle2 className="h-3.5 w-3.5" />
                       <span>Review & Approve</span>
                     </button>
                   </div>
@@ -1203,21 +1209,21 @@ export default function Knowledge() {
       {/* TAB 3: INDEX & HEALTH */}
       {activeTab === "index" && (
         <div className="space-y-4">
-          <div className="p-6 rounded-2xl bg-[#10151B] border border-[rgba(161,161,170,0.18)] space-y-4">
+          <div className="p-6 rounded-2xl bg-[var(--admin-card)] border border-[var(--admin-border)] space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-[#F5F5F5] flex items-center gap-2">
+                <h3 className="text-sm font-bold text-[var(--admin-text)] flex items-center gap-2">
                   <Database className="h-4 w-4 text-emerald-400" />
                   Pure-Python TF-IDF Retrieval Index Status
                 </h3>
-                <p className="text-xs text-[#A1A1AA] mt-0.5">
+                <p className="text-xs text-[var(--admin-text-muted)] mt-0.5">
                   The in-memory retrieval index powers deterministic sub-second customer query answering.
                 </p>
               </div>
 
               <span
                 className={cn(
-                  "text-xs font-mono font-bold px-3 py-1 rounded-full border uppercase",
+                  "text-xs font-mono font-semibold px-3 py-1 rounded-full border",
                   indexHealth?.status === "healthy"
                     ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
                     : "bg-amber-500/10 text-amber-400 border-amber-500/30"
@@ -1228,33 +1234,33 @@ export default function Knowledge() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-              <div className="p-4 rounded-xl bg-[#050709] border border-[rgba(161,161,170,0.1)]">
-                <span className="text-xs text-[#A1A1AA]">Active Indexed Documents</span>
-                <p className="text-xl font-bold font-mono text-[#F5F5F5] mt-1">
+              <div className="p-4 rounded-xl bg-[var(--admin-elevated)] border border-[var(--admin-border)]">
+                <span className="text-xs text-[var(--admin-text-muted)]">Active Indexed Documents</span>
+                <p className="text-xl font-bold font-mono text-[var(--admin-text)] mt-1">
                   {indexHealth?.total_indexed ?? 0}
                 </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Only verified & published entries</p>
+                <p className="text-[11px] text-[var(--admin-text-muted)] mt-0.5">Only verified & published entries</p>
               </div>
 
-              <div className="p-4 rounded-xl bg-[#050709] border border-[rgba(161,161,170,0.1)]">
-                <span className="text-xs text-[#A1A1AA]">Loaded Synonyms</span>
-                <p className="text-xl font-bold font-mono text-[#F5F5F5] mt-1">
+              <div className="p-4 rounded-xl bg-[var(--admin-elevated)] border border-[var(--admin-border)]">
+                <span className="text-xs text-[var(--admin-text-muted)]">Loaded Synonyms</span>
+                <p className="text-xl font-bold font-mono text-[var(--admin-text)] mt-1">
                   {indexHealth?.synonym_count ?? indexHealth?.in_memory_synonyms_loaded ?? 0}
                 </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Including Telugu transliterations</p>
+                <p className="text-[11px] text-[var(--admin-text-muted)] mt-0.5">Including Telugu transliterations</p>
               </div>
 
-              <div className="p-4 rounded-xl bg-[#050709] border border-[rgba(161,161,170,0.1)]">
-                <span className="text-xs text-[#A1A1AA]">Last Rebuilt</span>
-                <p className="text-sm font-semibold font-mono text-[#F5F5F5] mt-2 truncate">
+              <div className="p-4 rounded-xl bg-[var(--admin-elevated)] border border-[var(--admin-border)]">
+                <span className="text-xs text-[var(--admin-text-muted)]">Last Rebuilt</span>
+                <p className="text-sm font-semibold font-mono text-[var(--admin-text)] mt-2 truncate">
                   {indexHealth?.last_refresh ? new Date(indexHealth.last_refresh).toLocaleString() : "System Startup"}
                 </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Atomic memory swap</p>
+                <p className="text-[11px] text-[var(--admin-text-muted)] mt-0.5">Atomic memory swap</p>
               </div>
             </div>
 
-            <div className="pt-4 border-t border-[rgba(161,161,170,0.1)] flex items-center justify-between">
-              <div className="text-xs text-[#A1A1AA]">
+            <div className="pt-4 border-t border-[var(--admin-border)] flex items-center justify-between">
+              <div className="text-xs text-[var(--admin-text-muted)]">
                 Rebuilding refreshes the TF-IDF matrix from all published knowledge entries in TiDB.
               </div>
               <button
@@ -1280,11 +1286,11 @@ export default function Knowledge() {
         <form onSubmit={handleSaveEntry} className="space-y-4 p-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-semibold text-[#A1A1AA] mb-1 block">Category</label>
+              <label className="text-xs font-semibold text-[var(--admin-text-muted)] mb-1 block">Category</label>
               <select
                 value={formCategory}
                 onChange={(e) => setFormCategory(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs font-medium"
+                className="w-full px-3 py-2 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs font-medium"
               >
                 {/* Dynamic injection for any unrecognized category so stored category is never altered */}
                 {formCategory && !ALL_KNOWLEDGE_CATEGORIES.includes(formCategory as any) && (
@@ -1308,11 +1314,11 @@ export default function Knowledge() {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-[#A1A1AA] mb-1 block">Retrieval Type</label>
+              <label className="text-xs font-semibold text-[var(--admin-text-muted)] mb-1 block">Retrieval Type</label>
               <select
                 value={formRetrievalType}
                 onChange={(e) => setFormRetrievalType(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs font-medium"
+                className="w-full px-3 py-2 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs font-medium"
               >
                 <option value="GUIDE">GUIDE (Static knowledge base)</option>
                 <option value="LIVE_DB">LIVE_DB (Account/Order lookup)</option>
@@ -1322,19 +1328,19 @@ export default function Knowledge() {
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-[#A1A1AA] mb-1 block">Canonical Question</label>
+            <label className="text-xs font-semibold text-[var(--admin-text-muted)] mb-1 block">Canonical Question</label>
             <input
               type="text"
               value={formQuestion}
               onChange={(e) => setFormQuestion(e.target.value)}
               placeholder="e.g., How do I cancel a booking and what is the refund fee?"
-              className="w-full px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs font-medium focus:outline-none focus:border-emerald-400"
+              className="w-full px-3 py-2 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs font-medium focus:outline-none focus:border-emerald-400"
               required
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-[#A1A1AA] mb-1 block">
+            <label className="text-xs font-semibold text-[var(--admin-text-muted)] mb-1 block">
               Alternative Questions & Synonyms (Comma separated)
             </label>
             <input
@@ -1342,72 +1348,72 @@ export default function Knowledge() {
               value={formSynonyms}
               onChange={(e) => setFormSynonyms(e.target.value)}
               placeholder="e.g. cancel order, refund policy, raddhu cheyatam ela, booking raddhu"
-              className="w-full px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs font-medium focus:outline-none focus:border-emerald-400"
+              className="w-full px-3 py-2 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs font-medium focus:outline-none focus:border-emerald-400"
             />
-            <p className="text-[10px] text-[#A1A1AA] mt-1">Supports Telugu-English transliterated phrasings.</p>
+            <p className="text-[11px] text-[var(--admin-text-muted)] mt-1">Supports Telugu-English transliterated phrasings.</p>
           </div>
 
           {/* Answer Markdown + Realtime Preview */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-semibold text-[#A1A1AA] mb-1 block">
+              <label className="text-xs font-semibold text-[var(--admin-text-muted)] mb-1 block">
                 Answer Markdown
               </label>
               <textarea
                 value={formAnswer}
                 onChange={(e) => setFormAnswer(e.target.value)}
-                placeholder="Enter markdown formatted response..."
+                placeholder="Enter markdown formatted response"
                 rows={10}
-                className="w-full px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs font-mono focus:outline-none focus:border-emerald-400 leading-relaxed"
+                className="w-full px-3 py-2 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs font-mono focus:outline-none focus:border-emerald-400 leading-relaxed"
                 required
               />
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-[#A1A1AA] mb-1 block">Live Markdown Preview</label>
-              <div className="p-3 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] h-[225px] overflow-y-auto">
+              <label className="text-xs font-semibold text-[var(--admin-text-muted)] mb-1 block">Live Markdown Preview</label>
+              <div className="p-3 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] h-56 overflow-y-auto">
                 {formAnswer.trim() ? (
                   <MarkdownPreview content={formAnswer} />
                 ) : (
-                  <span className="text-xs text-[#A1A1AA]">Markdown preview will render here...</span>
+                  <span className="text-xs text-[var(--admin-text-muted)]">Markdown preview will render here...</span>
                 )}
               </div>
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-[#A1A1AA] mb-1 block">
+            <label className="text-xs font-semibold text-[var(--admin-text-muted)] mb-1 block">
               Verification Notes & Evidence (Audit log reference)
             </label>
             <input
               type="text"
               value={formVerificationNotes}
               onChange={(e) => setFormVerificationNotes(e.target.value)}
-              placeholder="e.g. Verified against Operations SOP v2 or ticket reference..."
-              className="w-full px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs font-medium focus:outline-none focus:border-emerald-400"
+              placeholder="e.g. Verified against Operations SOP v2 or ticket reference"
+              className="w-full px-3 py-2 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs font-medium focus:outline-none focus:border-emerald-400"
             />
           </div>
 
           {editingEntry && (
             <div>
-              <label className="text-xs font-semibold text-[#A1A1AA] mb-1 block">
+              <label className="text-xs font-semibold text-[var(--admin-text-muted)] mb-1 block">
                 Audit Change Reason (Stored in version history)
               </label>
               <input
                 type="text"
                 value={formChangeReason}
                 onChange={(e) => setFormChangeReason(e.target.value)}
-                placeholder="Explain the reason for this edit..."
-                className="w-full px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs font-medium focus:outline-none focus:border-emerald-400"
+                placeholder="Explain the reason for this edit"
+                className="w-full px-3 py-2 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs font-medium focus:outline-none focus:border-emerald-400"
               />
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-2 pt-4 border-t border-[rgba(161,161,170,0.1)]">
+          <div className="flex items-center justify-end gap-2 pt-4 border-t border-[var(--admin-border)]">
             <button
               type="button"
               onClick={() => setEditorOpen(false)}
-              className="px-4 py-2 rounded-lg bg-[#171C23] hover:bg-[#171C23]/80 text-[#F5F5F5] text-xs font-medium transition-colors border border-[rgba(161,161,170,0.18)] cursor-pointer"
+              className="px-4 py-2 rounded-lg bg-[var(--admin-elevated)] hover:bg-[var(--admin-elevated)]/80 text-[var(--admin-text)] text-xs font-medium transition-colors border border-[var(--admin-border)] cursor-pointer"
             >
               Cancel
             </button>
@@ -1430,16 +1436,16 @@ export default function Knowledge() {
         size="lg"
       >
         <div className="p-6 space-y-4">
-          <div className="text-xs text-[#A1A1AA]">
+          <div className="text-xs text-[var(--admin-text-muted)]">
             Immutable audit record of all previous revisions. Rolling back creates a new forward version preserving full history.
           </div>
 
           {loadingVersions ? (
-            <div className="py-12 text-center text-xs text-[#A1A1AA]">Loading revision history...</div>
+            <div className="py-12 text-center text-xs text-[var(--admin-text-muted)]">Loading revision history...</div>
           ) : versions.length === 0 ? (
-            <div className="py-12 text-center text-xs text-[#A1A1AA]">No historical revisions found.</div>
+            <div className="py-12 text-center text-xs text-[var(--admin-text-muted)]">No historical revisions found.</div>
           ) : (
-            <div className="space-y-3 max-h-[450px] overflow-y-auto">
+            <div className="space-y-3 max-h-112 overflow-y-auto">
               {versions.map((v) => {
                 const isCurrent = historyEntry && historyEntry.version === v.version;
                 return (
@@ -1449,18 +1455,18 @@ export default function Knowledge() {
                       "p-4 rounded-xl border space-y-2",
                       isCurrent
                         ? "bg-emerald-500/5 border-emerald-500/30"
-                        : "bg-[#050709] border-[rgba(161,161,170,0.18)]"
+                        : "bg-[var(--admin-elevated)] border-[var(--admin-border)]"
                     )}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-[#F5F5F5]">Version {v.version}</span>
+                        <span className="font-mono text-xs font-bold text-[var(--admin-text)]">Version {v.version}</span>
                         {isCurrent && (
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                          <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
                             Current Active
                           </span>
                         )}
-                        <span className="text-[10px] font-mono text-[#A1A1AA]">
+                        <span className="text-[11px] font-mono text-[var(--admin-text-muted)]">
                           {new Date(v.created_at).toLocaleString()}
                         </span>
                       </div>
@@ -1469,7 +1475,7 @@ export default function Knowledge() {
                         <button
                           onClick={() => handleRollback(v.version)}
                           disabled={rollingBack}
-                          className="px-2.5 py-1 rounded bg-[#171C23] hover:bg-neutral-800 text-[#F5F5F5] border border-[rgba(161,161,170,0.18)] text-[11px] font-medium flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                          className="px-2.5 py-1 rounded bg-[var(--admin-elevated)] hover:bg-[var(--admin-card)] text-[var(--admin-text)] border border-[var(--admin-border)] text-[11px] font-medium flex items-center gap-1 cursor-pointer disabled:opacity-50"
                         >
                           <RotateCcw className="h-3 w-3" />
                           <span>Rollback to this</span>
@@ -1477,10 +1483,10 @@ export default function Knowledge() {
                       )}
                     </div>
 
-                    <div className="text-xs text-[#F5F5F5] font-medium">{v.canonical_question}</div>
-                    <div className="text-[11px] text-[#A1A1AA] line-clamp-2">{v.answer_markdown}</div>
+                    <div className="text-xs text-[var(--admin-text)] font-medium">{v.canonical_question}</div>
+                    <div className="text-[11px] text-[var(--admin-text-muted)] line-clamp-2">{v.answer_markdown}</div>
 
-                    <div className="text-[10px] font-mono text-[#A1A1AA] flex items-center gap-3 pt-1 border-t border-[rgba(161,161,170,0.1)]">
+                    <div className="text-[11px] font-mono text-[var(--admin-text-muted)] flex items-center gap-3 pt-1 border-t border-[var(--admin-border)]">
                       <span>Changed By: {v.changed_by || "System"}</span>
                       {v.change_reason && <span>Reason: {v.change_reason}</span>}
                     </div>
@@ -1500,18 +1506,18 @@ export default function Knowledge() {
         size="lg"
       >
         <div className="p-6 space-y-4">
-          <div className="p-3 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] space-y-1">
-            <span className="text-[11px] font-semibold text-[#A1A1AA]">Customer Query (Source):</span>
-            <p className="text-xs text-[#F5F5F5] font-medium">{selectedDraft?.customer_query}</p>
+          <div className="p-3 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] space-y-1">
+            <span className="text-[11px] font-semibold text-[var(--admin-text-muted)]">Customer Query (Source):</span>
+            <p className="text-xs text-[var(--admin-text)] font-medium">{selectedDraft?.customer_query}</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-semibold text-[#A1A1AA] mb-1 block">Category</label>
+              <label className="text-xs font-semibold text-[var(--admin-text-muted)] mb-1 block">Category</label>
               <select
                 value={draftCategory}
                 onChange={(e) => setDraftCategory(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs"
+                className="w-full px-3 py-1.5 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs"
               >
                 {draftCategory && !ALL_KNOWLEDGE_CATEGORIES.includes(draftCategory as any) && (
                   <option value={draftCategory}>{draftCategory}</option>
@@ -1534,11 +1540,11 @@ export default function Knowledge() {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-[#A1A1AA] mb-1 block">Retrieval Type</label>
+              <label className="text-xs font-semibold text-[var(--admin-text-muted)] mb-1 block">Retrieval Type</label>
               <select
                 value={draftRetrievalType}
                 onChange={(e) => setDraftRetrievalType(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs"
+                className="w-full px-3 py-1.5 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs"
               >
                 <option value="GUIDE">GUIDE</option>
                 <option value="LIVE_DB">LIVE_DB</option>
@@ -1548,33 +1554,33 @@ export default function Knowledge() {
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-[#A1A1AA] mb-1 block">Canonical Question</label>
+            <label className="text-xs font-semibold text-[var(--admin-text-muted)] mb-1 block">Canonical Question</label>
             <input
               type="text"
               value={draftQuestion}
               onChange={(e) => setDraftQuestion(e.target.value)}
-              className="w-full px-3 py-1.5 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs"
+              className="w-full px-3 py-1.5 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-[#A1A1AA] mb-1 block">Suggested Answer</label>
+            <label className="text-xs font-semibold text-[var(--admin-text-muted)] mb-1 block">Suggested Answer</label>
             <textarea
               value={draftAnswer}
               onChange={(e) => setDraftAnswer(e.target.value)}
               rows={5}
-              className="w-full px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs font-mono"
+              className="w-full px-3 py-2 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs font-mono"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-[#A1A1AA] mb-1 block">Synonyms</label>
+            <label className="text-xs font-semibold text-[var(--admin-text-muted)] mb-1 block">Synonyms</label>
             <input
               type="text"
               value={draftSynonyms}
               onChange={(e) => setDraftSynonyms(e.target.value)}
-              placeholder="Comma-separated synonyms..."
-              className="w-full px-3 py-1.5 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs"
+              placeholder="Comma-separated synonyms"
+              className="w-full px-3 py-1.5 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs"
             />
           </div>
 
@@ -1582,24 +1588,24 @@ export default function Knowledge() {
             <div>
               <input
                 type="text"
-                placeholder="Reason to reject..."
+                placeholder="Reason to reject"
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs"
+                className="w-full px-3 py-1.5 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs"
               />
             </div>
             <div>
               <input
                 type="text"
-                placeholder="Notes to request changes..."
+                placeholder="Notes to request changes"
                 value={changeNotes}
                 onChange={(e) => setChangeNotes(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs"
+                className="w-full px-3 py-1.5 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs"
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-4 border-t border-[rgba(161,161,170,0.1)]">
+          <div className="flex items-center justify-between pt-4 border-t border-[var(--admin-border)]">
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -1654,13 +1660,13 @@ export default function Knowledge() {
                 </div>
               </div>
             ) : (
-              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2.5">
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[var(--admin-warning)] text-xs flex items-start gap-2.5">
                 <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-semibold text-amber-200">
                     Unresolved Marker Detected: <code className="bg-amber-500/20 px-1 py-0.5 rounded font-mono">{remainingMarkers.join(", ")}</code>
                   </p>
-                  <p className="text-[11px] text-amber-300/80 mt-0.5">
+                  <p className="text-[11px] text-[var(--admin-warning)]/80 mt-0.5">
                     This knowledge entry cannot be verified while containing unconfirmed policy placeholders. Edit the answer text to reflect confirmed production policy before completing verification.
                   </p>
                 </div>
@@ -1669,19 +1675,19 @@ export default function Knowledge() {
           })()}
 
           {/* Canonical Question Reference */}
-          <div className="p-3 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] space-y-1.5">
+          <div className="p-3 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] space-y-1.5">
             <div className="flex items-center justify-between text-[11px]">
-              <span className="font-semibold text-[#A1A1AA] uppercase tracking-wider">Canonical Question</span>
+              <span className="font-semibold text-[var(--admin-text-muted)]">Canonical Question</span>
               <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded bg-neutral-800 text-[#A1A1AA] text-[10px] font-mono">
+                <span className="px-2 py-0.5 rounded bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] text-[11px] font-mono">
                   {resolvingEntry?.category}
                 </span>
-                <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/30 text-[10px] font-mono">
+                <span className="px-2 py-0.5 rounded bg-[var(--admin-elevated)] text-[var(--admin-text-secondary)] border border-[var(--admin-border)] text-[11px] font-mono">
                   {resolvingEntry?.retrieval_type}
                 </span>
               </div>
             </div>
-            <p className="text-xs font-semibold text-[#F5F5F5]">
+            <p className="text-xs font-semibold text-[var(--admin-text)]">
               {resolvingEntry?.canonical_question}
             </p>
           </div>
@@ -1690,10 +1696,10 @@ export default function Knowledge() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-semibold text-[#A1A1AA] block">
+                <label className="text-xs font-semibold text-[var(--admin-text-muted)] block">
                   Corrected Answer Markdown
                 </label>
-                <span className="text-[10px] text-[#A1A1AA]">
+                <span className="text-[11px] text-[var(--admin-text-muted)]">
                   {extractVerifyMarkers(resolveAnswer).length > 0 ? (
                     <span className="text-amber-400 font-mono">Contains [VERIFY]</span>
                   ) : (
@@ -1704,20 +1710,20 @@ export default function Knowledge() {
               <textarea
                 value={resolveAnswer}
                 onChange={(e) => setResolveAnswer(e.target.value)}
-                placeholder="Enter confirmed production policy markdown..."
+                placeholder="Enter confirmed production policy markdown"
                 rows={11}
-                className="w-full px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs font-mono focus:outline-none focus:border-emerald-400 leading-relaxed"
+                className="w-full px-3 py-2 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs font-mono focus:outline-none focus:border-emerald-400 leading-relaxed"
                 required
               />
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-[#A1A1AA] mb-1 block">Live Markdown Preview</label>
-              <div className="p-3 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] h-[245px] overflow-y-auto">
+              <label className="text-xs font-semibold text-[var(--admin-text-muted)] mb-1 block">Live Markdown Preview</label>
+              <div className="p-3 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] h-60 overflow-y-auto">
                 {resolveAnswer.trim() ? (
                   <MarkdownPreview content={resolveAnswer} />
                 ) : (
-                  <span className="text-xs text-[#A1A1AA]">Markdown preview will render here...</span>
+                  <span className="text-xs text-[var(--admin-text-muted)]">Markdown preview will render here...</span>
                 )}
               </div>
             </div>
@@ -1726,26 +1732,26 @@ export default function Knowledge() {
           {/* Verification Notes / Evidence Input */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-semibold text-[#A1A1AA] block">
+              <label className="text-xs font-semibold text-[var(--admin-text-muted)] block">
                 Verification Notes & Evidence <span className="text-amber-400">*</span>
               </label>
-              <span className="text-[10px] text-[#A1A1AA]">Required for verification approval</span>
+              <span className="text-[11px] text-[var(--admin-text-muted)]">Required for verification approval</span>
             </div>
             <textarea
               value={resolveNotes}
               onChange={(e) => setResolveNotes(e.target.value)}
-              placeholder="e.g. Verified with Operations and confirmed Thursday delivery payout schedule per Delivery Partner Agreement v2..."
+              placeholder="Verified policy reference or ticket ID"
               rows={3}
-              className="w-full px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs focus:outline-none focus:border-emerald-400"
+              className="w-full px-3 py-2 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs focus:outline-none focus:border-emerald-400"
             />
-            <p className="text-[10px] text-[#A1A1AA] mt-1">
+            <p className="text-[11px] text-[var(--admin-text-muted)] mt-1">
               Document the policy confirmation source, ticket ID, or business stakeholder approval. Stored in immutable audit logs.
             </p>
           </div>
 
           {/* Audit Change Reason */}
           <div>
-            <label className="text-xs font-semibold text-[#A1A1AA] mb-1 block">
+            <label className="text-xs font-semibold text-[var(--admin-text-muted)] mb-1 block">
               Audit Change Reason (Version history log)
             </label>
             <input
@@ -1753,16 +1759,16 @@ export default function Knowledge() {
               value={resolveChangeReason}
               onChange={(e) => setResolveChangeReason(e.target.value)}
               placeholder="e.g. Resolved [VERIFY] marker with confirmed policy"
-              className="w-full px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs font-medium focus:outline-none focus:border-emerald-400"
+              className="w-full px-3 py-2 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs font-medium focus:outline-none focus:border-emerald-400"
             />
           </div>
 
           {/* Modal Actions */}
-          <div className="flex items-center justify-between pt-4 border-t border-[rgba(161,161,170,0.1)]">
+          <div className="flex items-center justify-between pt-4 border-t border-[var(--admin-border)]">
             <button
               type="button"
               onClick={() => setResolveModalOpen(false)}
-              className="px-4 py-2 rounded-lg bg-[#171C23] hover:bg-[#171C23]/80 text-[#F5F5F5] text-xs font-medium transition-colors border border-[rgba(161,161,170,0.18)] cursor-pointer"
+              className="px-4 py-2 rounded-lg bg-[var(--admin-elevated)] hover:bg-[var(--admin-elevated)]/80 text-[var(--admin-text)] text-xs font-medium transition-colors border border-[var(--admin-border)] cursor-pointer"
             >
               Cancel
             </button>
@@ -1773,7 +1779,7 @@ export default function Knowledge() {
                 onClick={handleSaveDraftResolution}
                 disabled={resolvingSaving || resolvingVerifying || !resolveAnswer.trim()}
                 title="Save changes to draft while keeping status pending_review"
-                className="px-4 py-2 rounded-lg bg-[#171C23] hover:bg-neutral-800 text-amber-400 border border-amber-500/30 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 rounded-lg bg-[var(--admin-elevated)] hover:bg-[var(--admin-card)] text-amber-400 border border-amber-500/30 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
               >
                 {resolvingSaving ? "Saving Draft..." : "Save Draft (Keep Pending)"}
               </button>
@@ -1804,6 +1810,16 @@ export default function Knowledge() {
           </div>
         </div>
       </Modal>
+      <ConfirmDialog
+        isOpen={rollbackVersionTarget !== null}
+        onClose={() => setRollbackVersionTarget(null)}
+        onConfirm={executeRollback}
+        title="Roll back knowledge version"
+        description={`Create a new forward version restoring "${historyEntry?.id || ""}" to version ${rollbackVersionTarget ?? ""}?`}
+        confirmLabel="Roll back"
+        destructive={false}
+        loading={rollingBack}
+      />
     </div>
   );
 }

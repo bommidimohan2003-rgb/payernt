@@ -20,7 +20,6 @@ import {
   Equal,
   Lock,
   Clock,
-  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -173,7 +172,7 @@ export default function PinVerification() {
       setLastError(null);
       const result = await pinVerificationService.verifyPin(fullPin);
       setVerificationResult(result);
-      toast.success("PIN Verified Successfully! Product and booking details retrieved.");
+      toast.success("PIN verified Product and booking details retrieved.");
       // Clear PIN inputs after verification for security
       setPinDigits(Array(8).fill(""));
     } catch (err: any) {
@@ -192,30 +191,30 @@ export default function PinVerification() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[rgba(161,161,170,0.18)] pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[var(--admin-border)] pb-5">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="p-1 rounded bg-white/10 text-white">
               <KeyRound className="h-4 w-4" />
             </span>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#F5F5F5]">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--admin-text)]">
               8-Digit PIN Verification
             </h1>
           </div>
-          <p className="text-xs sm:text-sm text-[#A1A1AA]">
+          <p className="text-xs sm:text-sm text-[var(--admin-text-muted)]">
             Verify product security PIN (Vendor 4-digit + Renter 4-digit) to inspect authorized product and booking status.
           </p>
         </div>
 
         {/* Top Action Tabs */}
-        <div className="flex items-center p-1 rounded-lg bg-[#10151B] border border-[rgba(161,161,170,0.18)] shrink-0 self-start sm:self-auto">
+        <div className="flex items-center p-1 rounded-lg bg-[var(--admin-card)] border border-[var(--admin-border)] shrink-0 self-start sm:self-auto">
           <button
             onClick={() => setActiveTab("verify")}
             className={cn(
-              "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5",
+              "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5",
               activeTab === "verify"
                 ? "bg-white text-black shadow-xs"
-                : "text-[#A1A1AA] hover:text-[#F5F5F5]"
+                : "text-[var(--admin-text-muted)] hover:text-[var(--admin-text)]"
             )}
           >
             <ShieldCheck className="h-3.5 w-3.5" />
@@ -224,10 +223,10 @@ export default function PinVerification() {
           <button
             onClick={() => setActiveTab("history")}
             className={cn(
-              "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5",
+              "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5",
               activeTab === "history"
                 ? "bg-white text-black shadow-xs"
-                : "text-[#A1A1AA] hover:text-[#F5F5F5]"
+                : "text-[var(--admin-text-muted)] hover:text-[var(--admin-text)]"
             )}
           >
             <Clock className="h-3.5 w-3.5" />
@@ -239,16 +238,16 @@ export default function PinVerification() {
       {activeTab === "verify" ? (
         <div className="space-y-6">
           {/* Main PIN Entry Card */}
-          <div className="p-6 md:p-8 rounded-xl bg-[#10151B] border border-[rgba(161,161,170,0.18)] shadow-lg relative overflow-hidden">
+          <div className="p-6 md:p-8 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-lg relative overflow-hidden">
             <div className="max-w-2xl mx-auto flex flex-col items-center text-center">
-              <div className="h-12 w-12 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-[#F5F5F5] mb-4">
+              <div className="h-12 w-12 rounded-xl bg-[var(--admin-elevated)] border border-[var(--admin-border)] flex items-center justify-center text-[var(--admin-text)] mb-4">
                 <KeyRound className="h-6 w-6" />
               </div>
 
-              <h2 className="text-lg sm:text-xl font-bold text-[#F5F5F5] mb-1">
+              <h2 className="text-lg sm:text-xl font-bold text-[var(--admin-text)] mb-1">
                 Enter 8-Digit Secret PIN
               </h2>
-              <p className="text-xs sm:text-sm text-[#A1A1AA] max-w-md mb-6">
+              <p className="text-xs sm:text-sm text-[var(--admin-text-muted)] max-w-md mb-6">
                 Enter the complete 8-digit PIN to verify product status, details, ownership, and booking authorization.
               </p>
 
@@ -276,11 +275,11 @@ export default function PinVerification() {
                       onPaste={handlePaste}
                       disabled={verifying}
                       className={cn(
-                        "w-10 h-12 sm:w-12 sm:h-14 rounded-lg bg-[#050709] border text-center text-lg sm:text-xl font-mono font-bold text-[#F5F5F5] transition-all focus:outline-none",
+                        "w-10 h-12 sm:w-12 sm:h-14 rounded-lg bg-[var(--admin-elevated)] border text-center text-lg sm:text-xl font-mono font-bold text-[var(--admin-text)] transition-colors focus:outline-none",
                         digit
-                          ? "border-white/40 bg-white/[0.04]"
-                          : "border-[rgba(161,161,170,0.18)] hover:border-white/20",
-                        "focus:border-white focus:ring-1 focus:ring-white/30"
+                          ? "border-[var(--admin-text)]/40 bg-[var(--admin-card)]"
+                          : "border-[var(--admin-border)] hover:border-[var(--admin-text)]/25",
+                        "focus:border-[var(--admin-text)] focus:ring-1 focus:ring-[var(--admin-text)]/20"
                       )}
                       aria-label={`Digit ${idx + 1}`}
                     />
@@ -293,7 +292,7 @@ export default function PinVerification() {
                 <button
                   type="button"
                   onClick={() => setIsMasked(!isMasked)}
-                  className="px-2.5 py-1 rounded text-[11px] font-medium text-[#A1A1AA] hover:text-[#F5F5F5] bg-white/5 hover:bg-white/10 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  className="px-2.5 py-1 rounded text-[11px] font-medium text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] bg-[var(--admin-elevated)] hover:opacity-85 transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
                   {isMasked ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
                   {isMasked ? "Show Digits" : "Mask Digits"}
@@ -302,7 +301,7 @@ export default function PinVerification() {
                 <button
                   type="button"
                   onClick={handleClear}
-                  className="px-2.5 py-1 rounded text-[11px] font-medium text-[#A1A1AA] hover:text-rose-400 bg-white/5 hover:bg-rose-500/10 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  className="px-2.5 py-1 rounded text-[11px] font-medium text-[var(--admin-text-muted)] hover:text-rose-400 bg-[var(--admin-elevated)] hover:bg-rose-500/10 transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
                   <RotateCcw className="h-3 w-3" />
                   Clear
@@ -324,15 +323,15 @@ export default function PinVerification() {
                   onClick={handleVerify}
                   disabled={!isPinComplete || verifying}
                   className={cn(
-                    "w-full sm:w-auto px-8 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md",
+                    "w-full sm:w-auto px-8 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-md",
                     isPinComplete && !verifying
-                      ? "bg-white text-black hover:bg-zinc-200"
-                      : "bg-white/20 text-zinc-400 cursor-not-allowed"
+                      ? "bg-[var(--admin-accent)] text-[var(--admin-bg)] hover:bg-[var(--admin-accent-hover)]"
+                      : "bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] border border-[var(--admin-border)] cursor-not-allowed"
                   )}
                 >
                   {verifying ? (
                     <>
-                      <div className="h-4 w-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                      <div className="h-4 w-4 border-2 border-[var(--admin-bg)] border-t-transparent rounded-full animate-spin" />
                       <span>Verifying 8-Digit PIN...</span>
                     </>
                   ) : (
@@ -347,50 +346,50 @@ export default function PinVerification() {
           </div>
 
           {/* Explanatory Card: "How 8-Digit PIN Works" */}
-          <div className="p-6 rounded-xl bg-[#10151B] border border-[rgba(161,161,170,0.18)]">
-            <h3 className="text-xs font-bold text-[#A1A1AA] uppercase tracking-wider mb-4">
+          <div className="p-6 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)]">
+            <h3 className="text-xs font-bold text-[var(--admin-text-muted)] mb-4">
               How 8-Digit PIN Works
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-center">
               {/* Box 1: Vendor PIN */}
-              <div className="md:col-span-2 p-4 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] flex items-start gap-3">
+              <div className="md:col-span-2 p-4 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] flex items-start gap-3">
                 <div className="p-2 rounded-md bg-white/10 text-white shrink-0 mt-0.5">
                   <KeyRound className="h-4 w-4" />
                 </div>
                 <div>
-                  <div className="text-[10px] font-bold text-[#A1A1AA] uppercase tracking-wider">
+                  <div className="text-[11px] font-bold text-[var(--admin-text-muted)]">
                     First 4 Digits
                   </div>
-                  <div className="text-sm font-semibold text-[#F5F5F5]">
+                  <div className="text-sm font-semibold text-[var(--admin-text)]">
                     Vendor 4-digit Secret PIN
                   </div>
-                  <p className="text-[11px] text-[#A1A1AA] mt-0.5">
+                  <p className="text-[11px] text-[var(--admin-text-muted)] mt-0.5">
                     Product security credential in system
                   </p>
                 </div>
               </div>
 
               {/* Separator Plus */}
-              <div className="flex justify-center text-[#A1A1AA]">
-                <div className="p-1.5 rounded-full bg-white/5 border border-white/10">
+              <div className="flex justify-center text-[var(--admin-text-muted)]">
+                <div className="p-1.5 rounded-full bg-white/5 border border-[var(--admin-border)]">
                   <Plus className="h-4 w-4" />
                 </div>
               </div>
 
               {/* Box 2: Renter PIN */}
-              <div className="md:col-span-2 p-4 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] flex items-start gap-3">
+              <div className="md:col-span-2 p-4 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] flex items-start gap-3">
                 <div className="p-2 rounded-md bg-white/10 text-white shrink-0 mt-0.5">
                   <User className="h-4 w-4" />
                 </div>
                 <div>
-                  <div className="text-[10px] font-bold text-[#A1A1AA] uppercase tracking-wider">
+                  <div className="text-[11px] font-bold text-[var(--admin-text-muted)]">
                     Last 4 Digits
                   </div>
-                  <div className="text-sm font-semibold text-[#F5F5F5]">
+                  <div className="text-sm font-semibold text-[var(--admin-text)]">
                     Renter 4-digit Secret PIN
                   </div>
-                  <p className="text-[11px] text-[#A1A1AA] mt-0.5">
+                  <p className="text-[11px] text-[var(--admin-text-muted)] mt-0.5">
                     Rental booking confirmation code
                   </p>
                 </div>
@@ -398,14 +397,14 @@ export default function PinVerification() {
             </div>
 
             {/* Equals Summary */}
-            <div className="mt-3 p-3.5 rounded-lg bg-[#171C23] border border-[rgba(161,161,170,0.18)] flex items-center justify-between">
+            <div className="mt-3 p-3.5 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-emerald-400" />
-                <span className="text-xs font-semibold text-[#F5F5F5]">
+                <span className="text-xs font-semibold text-[var(--admin-text)]">
                   Combined 8-Digit PIN = Authorized verification of product & rental context
                 </span>
               </div>
-              <span className="text-[11px] text-[#A1A1AA] font-mono hidden sm:inline-block">
+              <span className="text-[11px] text-[var(--admin-text-muted)] font-mono hidden sm:inline-block">
                 Preserves leading zeros & zero-disclosure security
               </span>
             </div>
@@ -413,7 +412,7 @@ export default function PinVerification() {
 
           {/* Verification Result Section (Panel 15) */}
           {verificationResult && (
-            <div className="p-6 rounded-xl bg-[#10151B] border border-emerald-500/30 space-y-6 animate-in fade-in-50 duration-300">
+            <div className="p-6 rounded-xl bg-[var(--admin-card)] border border-emerald-500/30 space-y-6 animate-in fade-in-50 duration-300">
               {/* Success Banner */}
               <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
@@ -422,24 +421,24 @@ export default function PinVerification() {
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-emerald-400">
-                      PIN Verified Successfully!
+                      PIN verified
                     </h3>
-                    <p className="text-xs text-[#A1A1AA]">
+                    <p className="text-xs text-[var(--admin-text-muted)]">
                       Product and booking details retrieved from authoritative record.
                     </p>
                   </div>
                 </div>
 
-                <div className="text-right text-[11px] text-[#A1A1AA] font-mono">
+                <div className="text-right text-[11px] text-[var(--admin-text-muted)] font-mono">
                   Verified on {new Date(verificationResult.verifiedAt).toLocaleString()}
                 </div>
               </div>
 
               {/* Product & Rental Overview Card */}
-              <div className="p-5 rounded-xl bg-[#050709] border border-[rgba(161,161,170,0.18)] grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="p-5 rounded-xl bg-[var(--admin-elevated)] border border-[var(--admin-border)] grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Left: Product Thumbnail & Title */}
                 <div className="lg:col-span-7 flex flex-col sm:flex-row gap-4 items-start">
-                  <div className="w-24 h-24 rounded-lg bg-[#171C23] border border-[rgba(161,161,170,0.18)] overflow-hidden shrink-0 flex items-center justify-center">
+                  <div className="w-24 h-24 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] overflow-hidden shrink-0 flex items-center justify-center">
                     {verificationResult.product.image ? (
                       <img
                         src={verificationResult.product.image}
@@ -447,19 +446,19 @@ export default function PinVerification() {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <Package className="h-8 w-8 text-zinc-500" />
+                      <Package className="h-8 w-8 text-[var(--admin-text-muted)]" />
                     )}
                   </div>
 
                   <div className="flex-1 space-y-2">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="text-base font-bold text-[#F5F5F5]">
+                      <h4 className="text-base font-bold text-[var(--admin-text)]">
                         {verificationResult.product.name}
                       </h4>
                       {/* Product Status Badge */}
                       <span
                         className={cn(
-                          "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                          "px-2 py-0.5 rounded-full text-[11px] font-bold ",
                           verificationResult.product.status.toLowerCase() === "active" ||
                             verificationResult.product.status.toLowerCase() === "approved"
                             ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
@@ -472,26 +471,26 @@ export default function PinVerification() {
                       </span>
                     </div>
 
-                    <div className="text-xs text-[#A1A1AA] font-mono">
+                    <div className="text-xs text-[var(--admin-text-muted)] font-mono">
                       Product ID: #{verificationResult.product.id}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-[rgba(161,161,170,0.18)] text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-[var(--admin-border)] text-xs">
                       <div>
-                        <span className="text-[10px] text-[#A1A1AA] uppercase">Category</span>
-                        <div className="font-semibold text-[#F5F5F5]">
+                        <span className="text-[11px] text-[var(--admin-text-muted)]">Category</span>
+                        <div className="font-semibold text-[var(--admin-text)]">
                           {verificationResult.product.category}
                         </div>
                       </div>
                       <div>
-                        <span className="text-[10px] text-[#A1A1AA] uppercase">Price/Day</span>
-                        <div className="font-semibold text-[#F5F5F5]">
+                        <span className="text-[11px] text-[var(--admin-text-muted)]">Price/Day</span>
+                        <div className="font-semibold text-[var(--admin-text)]">
                           ₹ {verificationResult.product.dailyRate.toLocaleString()}
                         </div>
                       </div>
                       <div>
-                        <span className="text-[10px] text-[#A1A1AA] uppercase">Deposit</span>
-                        <div className="font-semibold text-[#F5F5F5]">
+                        <span className="text-[11px] text-[var(--admin-text-muted)]">Deposit</span>
+                        <div className="font-semibold text-[var(--admin-text)]">
                           ₹ {verificationResult.product.securityDeposit.toLocaleString()}
                         </div>
                       </div>
@@ -500,29 +499,29 @@ export default function PinVerification() {
                 </div>
 
                 {/* Right: Renter Details Card */}
-                <div className="lg:col-span-5 p-4 rounded-lg bg-[#10151B] border border-[rgba(161,161,170,0.18)] flex flex-col justify-between">
+                <div className="lg:col-span-5 p-4 rounded-lg bg-[var(--admin-card)] border border-[var(--admin-border)] flex flex-col justify-between">
                   <div>
-                    <div className="text-[10px] font-bold text-[#A1A1AA] uppercase tracking-wider mb-2 flex items-center justify-between">
+                    <div className="text-[11px] font-bold text-[var(--admin-text-muted)] mb-2 flex items-center justify-between">
                       <span>Renter (Current Booking)</span>
                       <span className="font-mono text-zinc-400">#{verificationResult.booking.id}</span>
                     </div>
 
                     <div className="space-y-1">
-                      <div className="text-sm font-bold text-[#F5F5F5]">
+                      <div className="text-sm font-bold text-[var(--admin-text)]">
                         {verificationResult.renter.name}
                       </div>
-                      <div className="text-xs text-[#A1A1AA] font-mono">
+                      <div className="text-xs text-[var(--admin-text-muted)] font-mono">
                         {verificationResult.renter.phone}
                       </div>
-                      <div className="text-xs text-[#A1A1AA]">
+                      <div className="text-xs text-[var(--admin-text-muted)]">
                         {verificationResult.renter.email}
                       </div>
                     </div>
                   </div>
 
-                  <div className="pt-3 border-t border-[rgba(161,161,170,0.18)] flex items-center justify-between text-xs mt-3">
-                    <span className="text-[#A1A1AA]">Vendor:</span>
-                    <span className="font-medium text-[#F5F5F5]">
+                  <div className="pt-3 border-t border-[var(--admin-border)] flex items-center justify-between text-xs mt-3">
+                    <span className="text-[var(--admin-text-muted)]">Vendor:</span>
+                    <span className="font-medium text-[var(--admin-text)]">
                       {verificationResult.product.vendor.name}
                     </span>
                   </div>
@@ -532,15 +531,15 @@ export default function PinVerification() {
               {/* Status Row & Navigation Actions */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
                 <div className="flex items-center gap-3 flex-wrap">
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-xs">
-                    <span className="text-[#A1A1AA]">Product Status:</span>
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-xs">
+                    <span className="text-[var(--admin-text-muted)]">Product Status:</span>
                     <span className="font-bold text-emerald-400">
                       {verificationResult.product.status}
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-xs">
-                    <span className="text-[#A1A1AA]">Booking Status:</span>
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-xs">
+                    <span className="text-[var(--admin-text-muted)]">Booking Status:</span>
                     <span className="font-bold text-zinc-300">
                       {verificationResult.booking.status}
                     </span>
@@ -550,7 +549,7 @@ export default function PinVerification() {
                 <div className="flex items-center gap-2.5">
                   <Link
                     to="/admin/products"
-                    className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-[#F5F5F5] text-xs font-semibold transition-colors flex items-center gap-1.5"
+                    className="px-4 py-2 rounded-lg bg-[var(--admin-elevated)] hover:opacity-85 text-[var(--admin-text)] border border-[var(--admin-border)] text-xs font-semibold transition-colors flex items-center gap-1.5"
                   >
                     <Package className="h-3.5 w-3.5" />
                     View Product
@@ -558,7 +557,7 @@ export default function PinVerification() {
 
                   <Link
                     to="/admin/bookings"
-                    className="px-4 py-2 rounded-lg bg-white text-black hover:bg-zinc-200 text-xs font-semibold transition-colors flex items-center gap-1.5"
+                    className="px-4 py-2 rounded-lg bg-[var(--admin-accent)] text-[var(--admin-bg)] hover:bg-[var(--admin-accent-hover)] text-xs font-semibold transition-colors flex items-center gap-1.5"
                   >
                     <Calendar className="h-3.5 w-3.5" />
                     View Booking
@@ -570,27 +569,27 @@ export default function PinVerification() {
         </div>
       ) : (
         /* Verification History Tab */
-        <div className="p-6 rounded-xl bg-[#10151B] border border-[rgba(161,161,170,0.18)] space-y-4">
+        <div className="p-6 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <h3 className="text-base font-bold text-[#F5F5F5]">
+            <h3 className="text-base font-bold text-[var(--admin-text)]">
               PIN Verification Audit Log
             </h3>
 
             <div className="flex items-center gap-2">
               <div className="relative">
-                <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--admin-text-muted)]" />
                 <input
                   type="text"
-                  placeholder="Search logs..."
+                  placeholder="Search logs"
                   value={historySearch}
                   onChange={(e) => setHistorySearch(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-xs text-[#F5F5F5] placeholder:text-zinc-500 focus:outline-none focus:border-white/40"
+                  className="pl-8 pr-3 py-1.5 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-xs text-[var(--admin-text)] placeholder:text-[var(--admin-text-muted)] focus:outline-none focus:border-[var(--admin-text)]/40"
                 />
               </div>
 
               <button
                 onClick={fetchHistory}
-                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[#A1A1AA] hover:text-[#F5F5F5] border border-white/10 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg bg-[var(--admin-elevated)] hover:opacity-85 text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] border border-[var(--admin-border)] transition-colors cursor-pointer"
                 title="Refresh log"
               >
                 <RotateCcw className="h-4 w-4" />
@@ -599,9 +598,9 @@ export default function PinVerification() {
           </div>
 
           {/* History Data Table */}
-          <div className="rounded-lg border border-[rgba(161,161,170,0.18)] overflow-x-auto">
-            <table className="w-full text-left text-xs text-[#F5F5F5]">
-              <thead className="bg-[#050709] border-b border-[rgba(161,161,170,0.18)] text-[10px] font-bold text-[#A1A1AA] uppercase tracking-wider">
+          <div className="rounded-lg border border-[var(--admin-border)] overflow-x-auto">
+            <table className="w-full text-left text-xs text-[var(--admin-text)]">
+              <thead className="bg-[var(--admin-elevated)] border-b border-[var(--admin-border)] text-[11px] font-bold text-[var(--admin-text-muted)]">
                 <tr>
                   <th className="px-4 py-3">Verification ID</th>
                   <th className="px-4 py-3">Masked PIN</th>
@@ -613,22 +612,22 @@ export default function PinVerification() {
                   <th className="px-4 py-3">Timestamp</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[rgba(161,161,170,0.18)] bg-[#10151B]">
+              <tbody className="divide-y divide-[var(--admin-border)] bg-[var(--admin-card)]">
                 {historyLoading ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-zinc-500">
+                    <td colSpan={8} className="px-4 py-8 text-center text-[var(--admin-text-muted)]">
                       Loading verification history...
                     </td>
                   </tr>
                 ) : historyItems.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-zinc-500">
+                    <td colSpan={8} className="px-4 py-8 text-center text-[var(--admin-text-muted)]">
                       No PIN verification records found.
                     </td>
                   </tr>
                 ) : (
                   historyItems.map((item) => (
-                    <tr key={item.id} className="hover:bg-white/[0.02] transition-colors">
+                    <tr key={item.id} className="hover:bg-[var(--admin-elevated)]/60 transition-colors">
                       <td className="px-4 py-3 font-mono font-medium text-zinc-400">
                         {item.id}
                       </td>
@@ -638,7 +637,7 @@ export default function PinVerification() {
                       <td className="px-4 py-3">
                         <span
                           className={cn(
-                            "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
+                            "px-2 py-0.5 rounded-full text-[11px] font-medium",
                             item.outcome === "MATCHED"
                               ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                               : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
@@ -659,7 +658,7 @@ export default function PinVerification() {
                       <td className="px-4 py-3 text-zinc-400">
                         {item.adminName}
                       </td>
-                      <td className="px-4 py-3 text-zinc-500 font-mono text-[11px]">
+                      <td className="px-4 py-3 text-[var(--admin-text-muted)] font-mono text-[11px]">
                         {new Date(item.timestamp).toLocaleString()}
                       </td>
                     </tr>

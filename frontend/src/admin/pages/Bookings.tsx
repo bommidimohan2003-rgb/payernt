@@ -24,6 +24,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { adminWS } from "../services/websocket";
 import { AdminProductImage } from "../components/common/AdminProductImage";
+import { ConfirmDialog } from "../components/layout/ConfirmDialog";
+import { Modal } from "../components/layout/Modal";
 
 const RENTER_CANCELLATION_REASONS = [
   "I no longer need this product.",
@@ -76,6 +78,10 @@ export default function Bookings() {
   const [selectedBooking, setSelectedBooking] = useState<AdminBooking | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{ type: "reset" | "cancel" | "refund"; id?: string } | null>(null);
+  const [courierModalOpen, setCourierModalOpen] = useState(false);
+  const [courierNameInput, setCourierNameInput] = useState("");
+  const [courierPhoneInput, setCourierPhoneInput] = useState("");
 
   const fetchBookings = useCallback(async (silent = false) => {
     try {
@@ -98,18 +104,8 @@ export default function Bookings() {
     }
   }, []);
 
-  const handleResetBookings = async () => {
-    if (!confirm("Are you sure you want to reset all bookings? This will clear all booking entries.")) return;
-    try {
-      setActionLoading(true);
-      await bookingsService.resetAllBookings();
-      setBookings([]);
-      toast.success("All bookings have been reset.");
-    } catch {
-      toast.error("Failed to reset bookings.");
-    } finally {
-      setActionLoading(false);
-    }
+  const handleResetBookings = () => {
+    setConfirmAction({ type: "reset" });
   };
 
   useEffect(() => {
@@ -141,21 +137,8 @@ export default function Bookings() {
     }
   };
 
-  const handleCancel = async (id: string) => {
-    if (!confirm(`Are you sure you want to cancel booking #${id}?`)) return;
-    try {
-      setActionLoading(true);
-      const updated = await bookingsService.cancelBooking(id);
-      setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, ...updated, status: "cancelled" } : b)));
-      if (selectedBooking?.id === id) {
-        setSelectedBooking((prev) => prev ? { ...prev, ...updated, status: "cancelled" } : null);
-      }
-      toast.warning(`Booking #${id} cancelled.`);
-    } catch {
-      toast.error("Failed to cancel booking.");
-    } finally {
-      setActionLoading(false);
-    }
+  const handleCancel = (id: string) => {
+    setConfirmAction({ type: "cancel", id });
   };
 
   const handleComplete = async (id: string) => {
@@ -174,18 +157,66 @@ export default function Bookings() {
     }
   };
 
-  const handleRefund = async (id: string) => {
-    if (!confirm(`Are you sure you want to refund and cancel booking #${id}?`)) return;
+  const handleRefund = (id: string) => {
+    setConfirmAction({ type: "refund", id });
+  };
+
+  const executeConfirmedAction = async () => {
+    if (!confirmAction) return;
     try {
       setActionLoading(true);
-      const updated = await bookingsService.refundBooking(id);
-      setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, ...updated, status: "cancelled" } : b)));
-      if (selectedBooking?.id === id) {
-        setSelectedBooking((prev) => prev ? { ...prev, ...updated, status: "cancelled" } : null);
+      if (confirmAction.type === "reset") {
+        await bookingsService.resetAllBookings();
+        setBookings([]);
+        toast.success("All bookings have been reset.");
+      } else if (confirmAction.type === "cancel" && confirmAction.id) {
+        const id = confirmAction.id;
+        const updated = await bookingsService.cancelBooking(id);
+        setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, ...updated, status: "cancelled" } : b)));
+        if (selectedBooking?.id === id) {
+          setSelectedBooking((prev) => prev ? { ...prev, ...updated, status: "cancelled" } : null);
+        }
+        toast.warning(`Booking #${id} cancelled.`);
+      } else if (confirmAction.type === "refund" && confirmAction.id) {
+        const id = confirmAction.id;
+        const updated = await bookingsService.refundBooking(id);
+        setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, ...updated, status: "cancelled" } : b)));
+        if (selectedBooking?.id === id) {
+          setSelectedBooking((prev) => prev ? { ...prev, ...updated, status: "cancelled" } : null);
+        }
+        toast.success(`Booking #${id} payment refunded.`);
       }
-      toast.success(`Booking #${id} payment refunded.`);
+      setConfirmAction(null);
     } catch {
-      toast.error("Failed to process refund.");
+      toast.error("Action failed. Please try again.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSaveCourier = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBooking) return;
+    const name = courierNameInput.trim();
+    const phone = courierPhoneInput.trim();
+    if (!name) {
+      toast.error("Courier name is required.");
+      return;
+    }
+    try {
+      setActionLoading(true);
+      await bookingsService.assignDelivery(selectedBooking.id, {
+        deliveryBoyName: name,
+        deliveryBoyPhone: phone,
+      });
+      toast.success(`Assigned courier ${name} to booking #${selectedBooking.id}.`);
+      fetchBookings(true);
+      setSelectedBooking((prev) =>
+        prev ? { ...prev, deliveryBoyName: name, deliveryBoyPhone: phone } : null
+      );
+      setCourierModalOpen(false);
+    } catch {
+      toast.error("Failed to assign courier.");
     } finally {
       setActionLoading(false);
     }
@@ -267,7 +298,7 @@ export default function Bookings() {
       key: "id",
       label: "Booking ID",
       render: (row) => (
-        <span className="font-mono font-bold text-foreground text-xs">
+        <span className="font-mono font-bold text-[var(--admin-text)] text-xs">
           #{row.id}
         </span>
       ),
@@ -278,7 +309,7 @@ export default function Bookings() {
       render: (row) => (
         <div className="flex items-center gap-2.5">
           <AdminProductImage src={row.productImage} alt={row.productTitle} className="w-8 h-8 rounded-lg" />
-          <span className="font-bold text-foreground truncate max-w-xs text-xs">{row.productTitle}</span>
+          <span className="font-bold text-[var(--admin-text)] truncate max-w-xs text-xs">{row.productTitle}</span>
         </div>
       ),
     },
@@ -287,8 +318,8 @@ export default function Bookings() {
       label: "Renter",
       render: (row) => (
         <div className="min-w-0">
-          <div className="font-semibold text-foreground truncate text-xs">{row.customerName}</div>
-          <div className="text-[10px] text-muted-foreground font-mono truncate">{row.customerId}</div>
+          <div className="font-semibold text-[var(--admin-text)] truncate text-xs">{row.customerName}</div>
+          <div className="text-[11px] text-[var(--admin-text-muted)] font-mono truncate">{row.customerId}</div>
         </div>
       ),
     },
@@ -296,7 +327,7 @@ export default function Bookings() {
       key: "ownerName",
       label: "Lender",
       render: (row) => (
-        <span className="text-xs text-muted-foreground truncate">{row.ownerName || "Verified Lender"}</span>
+        <span className="text-xs text-[var(--admin-text-muted)] truncate">{row.ownerName || "Verified Lender"}</span>
       ),
     },
     {
@@ -304,15 +335,15 @@ export default function Bookings() {
       label: "Schedule",
       render: (row) => (
         <div className="text-xs">
-          <div className="font-semibold text-foreground">
+          <div className="font-semibold text-[var(--admin-text)]">
             {row.startDate} {row.endDate && row.endDate !== row.startDate ? `➔ ${row.endDate}` : ""}
           </div>
           {row.timeSlot ? (
-            <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-primary/10 text-primary uppercase">
+            <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-primary/10 text-primary">
               {row.timeSlot.replace(/_/g, " ")} {row.startTime && row.endTime ? `(${row.startTime}–${row.endTime})` : ""}
             </span>
           ) : (
-            <span className="text-[10px] text-muted-foreground">Full Day</span>
+            <span className="text-[11px] text-[var(--admin-text-muted)]">Full Day</span>
           )}
         </div>
       ),
@@ -322,7 +353,7 @@ export default function Bookings() {
       label: "Total Fee",
       sortable: true,
       render: (row) => (
-        <span className="font-mono font-bold text-foreground text-xs">
+        <span className="font-mono font-bold text-[var(--admin-text)] text-xs">
           ₹{(row.amount || 0).toLocaleString("en-IN")}
         </span>
       ),
@@ -337,8 +368,8 @@ export default function Bookings() {
             row.paymentStatus === "paid"
               ? "text-emerald-600 dark:text-emerald-400"
               : row.paymentStatus === "failed"
-              ? "text-[#FF1744]"
-              : "text-muted-foreground"
+              ? "text-[var(--admin-error)]"
+              : "text-[var(--admin-text-muted)]"
           )}
         >
           {row.paymentStatus || "unpaid"}
@@ -359,16 +390,16 @@ export default function Bookings() {
           <div className="space-y-1">
             <span
               className={cn(
-                "px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider border inline-flex items-center gap-1",
+                "px-2 py-0.5 rounded text-[11px] font-medium  border inline-flex items-center gap-1",
                 isCompleted
                   ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                   : isActive
-                  ? "bg-secondary text-foreground border-border/70"
+                  ? "bg-[var(--admin-elevated)] text-[var(--admin-text)] border-[var(--admin-border)]/70"
                   : isPending
                   ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
                   : isCancelled
-                  ? "bg-red-500/10 text-[#FF1744] border-red-500/20"
-                  : "bg-secondary text-muted-foreground border-border/60"
+                  ? "bg-red-500/10 text-[var(--admin-error)] border-red-500/20"
+                  : "bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] border-[var(--admin-border)]/60"
               )}
             >
               <span className="h-1.5 w-1.5 rounded-full bg-current" />
@@ -377,15 +408,15 @@ export default function Bookings() {
             {isCancelled && (
               <div className="pt-0.5 space-y-0.5">
                 <div
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-500/10 text-[#FF1744] border border-red-500/20 max-w-[200px] truncate"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium bg-red-500/10 text-[var(--admin-error)] border border-red-500/20 max-w-52 truncate"
                   title={`Reason: ${formatCancellationReason(row.cancellationReason)}${row.cancellationExplanation || row.cancellationFeedback ? `\nExplanation: ${row.cancellationExplanation || row.cancellationFeedback}` : ""}`}
                 >
-                  <AlertTriangle className="h-2.5 w-2.5 shrink-0 text-[#FF1744]" />
+                  <AlertTriangle className="h-2.5 w-2.5 shrink-0 text-[var(--admin-error)]" />
                   <span className="truncate">{formatCancellationReason(row.cancellationReason)}</span>
                 </div>
                 {(row.cancellationExplanation || row.cancellationFeedback) && (
                   <div
-                    className="text-[10px] text-muted-foreground italic truncate max-w-[200px]"
+                    className="text-[11px] text-[var(--admin-text-muted)] truncate max-w-52"
                     title={row.cancellationExplanation || row.cancellationFeedback}
                   >
                     "{row.cancellationExplanation || row.cancellationFeedback}"
@@ -394,7 +425,7 @@ export default function Bookings() {
               </div>
             )}
             {!isCancelled && row.deliveryStatus && (
-              <span className="block text-[9px] font-mono text-muted-foreground uppercase">
+              <span className="block text-[11px] font-mono text-[var(--admin-text-muted)]">
                 {row.deliveryStatus.replace(/_/g, " ")}
               </span>
             )}
@@ -413,7 +444,7 @@ export default function Bookings() {
               setSelectedBooking(row);
               setModalOpen(true);
             }}
-            className="p-1.5 rounded-md hover:bg-secondary text-foreground transition-colors cursor-pointer"
+            className="p-1.5 rounded-md hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] transition-colors cursor-pointer"
             title="Inspect booking & handover lifecycle"
           >
             <Eye className="h-3.5 w-3.5" />
@@ -431,7 +462,7 @@ export default function Bookings() {
               <button
                 onClick={() => handleCancel(row.id)}
                 disabled={actionLoading}
-                className="p-1.5 rounded-md bg-red-500/10 text-[#FF1744] hover:bg-red-500/20 border border-red-500/20 transition-colors cursor-pointer"
+                className="p-1.5 rounded-md bg-red-500/10 text-[var(--admin-error)] hover:bg-red-500/20 border border-red-500/20 transition-colors cursor-pointer"
                 title="Cancel booking"
               >
                 <XCircle className="h-3.5 w-3.5" />
@@ -470,7 +501,7 @@ export default function Bookings() {
           <button
             onClick={handleResetBookings}
             disabled={loading || actionLoading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 text-[#FF1744] text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 text-[var(--admin-error)] text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
             title="Reset all bookings data"
           >
             <RotateCcw className="h-3.5 w-3.5" />
@@ -506,7 +537,7 @@ export default function Bookings() {
               }
             }}
             className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer flex items-center gap-2",
+              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap cursor-pointer flex items-center gap-2",
               statusFilter === tab.id
                 ? "bg-[var(--admin-text)] text-[var(--admin-bg)] font-semibold shadow-xs"
                 : "text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] hover:bg-black/5 dark:hover:bg-white/5 border border-transparent"
@@ -515,9 +546,9 @@ export default function Bookings() {
             <span>{tab.label}</span>
             <span
               className={cn(
-                "px-1.5 py-0.5 rounded-full text-[10px] font-mono",
+                "px-1.5 py-0.5 rounded-full text-[11px] font-mono",
                 statusFilter === tab.id
-                  ? "bg-black/15 text-black dark:text-black font-bold"
+                  ? "bg-white/20 dark:bg-black/15 text-[var(--admin-bg)] font-medium"
                   : "bg-black/5 dark:bg-white/10 text-[var(--admin-text-secondary)]"
               )}
             >
@@ -532,14 +563,14 @@ export default function Bookings() {
         <div className="bg-[var(--admin-card)] rounded-xl border border-red-500/20 p-4 space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-[var(--admin-border)] pb-2.5">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-red-500/10 text-[#FF1744] flex items-center justify-center">
+              <div className="w-7 h-7 rounded-lg bg-red-500/10 text-[var(--admin-error)] flex items-center justify-center">
                 <BarChart3 className="h-4 w-4" />
               </div>
               <div>
                 <h3 className="text-xs font-bold text-[var(--admin-text)] flex items-center gap-2">
                   <span>Cancellation Reason Analytics</span>
                   {cancellationReasonFilter !== "all" && (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/10 text-[#FF1744] border border-red-500/20">
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-500/10 text-[var(--admin-error)] border border-red-500/20">
                       Filtering: {cancellationReasonFilter}
                     </span>
                   )}
@@ -547,7 +578,7 @@ export default function Bookings() {
                 <p className="text-[11px] text-[var(--admin-text-secondary)] mt-0.5">
                   {cancellationStats.total} total cancelled booking{cancellationStats.total === 1 ? "" : "s"}
                   {cancellationStats.topReason && (
-                    <> • Top Reason: <span className="font-semibold text-foreground">"{cancellationStats.topReason[0]}" ({cancellationStats.topReason[1]})</span></>
+                    <> • Top Reason: <span className="font-semibold text-[var(--admin-text)]">"{cancellationStats.topReason[0]}" ({cancellationStats.topReason[1]})</span></>
                   )}
                 </p>
               </div>
@@ -560,7 +591,7 @@ export default function Bookings() {
                   setCancellationReasonFilter("all");
                   setCurrentPage(1);
                 }}
-                className="self-start sm:self-auto text-[11px] font-semibold text-[#FF1744] hover:underline cursor-pointer flex items-center gap-1"
+                className="self-start sm:self-auto text-[11px] font-semibold text-[var(--admin-error)] hover:underline cursor-pointer flex items-center gap-1"
               >
                 <span>Clear reason filter</span>
                 <X className="h-3 w-3" />
@@ -577,14 +608,14 @@ export default function Bookings() {
                 setCurrentPage(1);
               }}
               className={cn(
-                "px-2.5 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer flex items-center gap-1.5",
+                "px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors cursor-pointer flex items-center gap-1.5",
                 cancellationReasonFilter === "all"
-                  ? "bg-red-500/20 text-[#FF1744] border-red-500/40 font-bold"
+                  ? "bg-red-500/20 text-[var(--admin-error)] border-red-500/40 font-bold"
                   : "bg-[var(--admin-elevated)] text-[var(--admin-text-secondary)] border-[var(--admin-border)] hover:text-[var(--admin-text)]"
               )}
             >
               <span>All Reasons</span>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-black/10 dark:bg-white/10 font-bold">
+              <span className="text-[11px] font-mono px-1.5 py-0.5 rounded-full bg-black/10 dark:bg-white/10 font-bold">
                 {cancellationStats.total}
               </span>
             </button>
@@ -601,16 +632,16 @@ export default function Bookings() {
                     setCurrentPage(1);
                   }}
                   className={cn(
-                    "px-2.5 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer flex items-center gap-1.5",
+                    "px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors cursor-pointer flex items-center gap-1.5",
                     isSelected
                       ? "bg-red-500 text-white border-red-600 font-bold shadow-xs"
                       : "bg-[var(--admin-elevated)] text-[var(--admin-text-secondary)] border-[var(--admin-border)] hover:border-red-500/40 hover:text-[var(--admin-text)]"
                   )}
                 >
-                  <span className="truncate max-w-[240px]">{reason}</span>
+                  <span className="truncate max-w-60">{reason}</span>
                   <span
                     className={cn(
-                      "text-[10px] font-mono px-1.5 py-0.5 rounded-full font-bold",
+                      "text-[11px] font-mono px-1.5 py-0.5 rounded-full font-bold",
                       isSelected ? "bg-white/20 text-white" : "bg-black/10 dark:bg-white/10 text-[var(--admin-text)]"
                     )}
                   >
@@ -629,7 +660,7 @@ export default function Bookings() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--admin-text-secondary)]" />
           <input
             type="text"
-            placeholder="Search by order ID, user or product..."
+            placeholder="Search by order ID, user, or product"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -647,7 +678,7 @@ export default function Bookings() {
                 setCancellationReasonFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-lg px-2.5 py-2 border border-red-500/30 focus:outline-none font-medium cursor-pointer max-w-[220px]"
+              className="bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-lg px-2.5 py-2 border border-red-500/30 focus:outline-none font-medium cursor-pointer max-w-56"
               title="Filter by cancellation reason"
             >
               <option value="all">All Reasons ({cancellationStats.total})</option>
@@ -699,7 +730,7 @@ export default function Bookings() {
           <p className="text-xs text-[var(--admin-text-secondary)] mt-1 max-w-sm">{error}</p>
           <button
             onClick={() => fetchBookings()}
-            className="mt-4 px-4 py-2 rounded-xl bg-[var(--admin-elevated)] hover:opacity-80 text-[var(--admin-text)] text-xs font-bold transition-all border border-[var(--admin-border)] cursor-pointer"
+            className="mt-4 px-4 py-2 rounded-xl bg-[var(--admin-elevated)] hover:opacity-80 text-[var(--admin-text)] text-xs font-bold transition-colors border border-[var(--admin-border)] cursor-pointer"
           >
             Retry Database Fetch
           </button>
@@ -735,34 +766,34 @@ export default function Bookings() {
 
       {/* BOOKING DETAIL MODAL */}
       {modalOpen && selectedBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-card border border-border/80 rounded-2xl shadow-2xl p-6 space-y-5">
-            <div className="flex items-center justify-between border-b border-border/40 pb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="w-full max-w-lg bg-[var(--admin-card)] border border-[var(--admin-border)]/80 rounded-2xl shadow-2xl p-6 space-y-5">
+            <div className="flex items-center justify-between border-b border-[var(--admin-border)] pb-4">
               <div>
-                <h3 className="text-sm font-bold text-foreground">Booking #{selectedBooking.id}</h3>
-                <p className="text-[11px] text-muted-foreground font-mono">
+                <h3 className="text-sm font-bold text-[var(--admin-text)]">Booking #{selectedBooking.id}</h3>
+                <p className="text-[11px] text-[var(--admin-text-muted)] font-mono">
                   {selectedBooking.createdAt ? new Date(selectedBooking.createdAt).toLocaleString() : "—"}
                 </p>
               </div>
               <button
                 onClick={() => setModalOpen(false)}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
+                className="p-1.5 rounded-lg text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-elevated)] cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="p-4 rounded-xl bg-secondary/40 border border-border/60 flex items-center gap-3">
+              <div className="p-4 rounded-xl bg-[var(--admin-elevated)]/40 border border-[var(--admin-border)]/60 flex items-center gap-3">
                 <AdminProductImage src={selectedBooking.productImage} alt={selectedBooking.productTitle} className="w-12 h-12 rounded-lg" />
                 <div className="min-w-0">
-                  <h4 className="font-bold text-foreground truncate">{selectedBooking.productTitle}</h4>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                  <h4 className="font-bold text-[var(--admin-text)] truncate">{selectedBooking.productTitle}</h4>
+                  <p className="text-[11px] text-[var(--admin-text-muted)] mt-0.5">
                     Rental Dates: {selectedBooking.startDate || "Start"} ➔ {selectedBooking.endDate || "End"}
                   </p>
                   {selectedBooking.timeSlot && (
                     <div className="mt-1">
-                      <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-primary/10 text-primary uppercase">
+                      <span className="inline-block px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-primary/10 text-primary">
                         Slot: {selectedBooking.timeSlot.replace(/_/g, " ")}{" "}
                         {selectedBooking.startTime && selectedBooking.endTime ? `(${selectedBooking.startTime} – ${selectedBooking.endTime})` : ""}
                       </span>
@@ -775,33 +806,33 @@ export default function Bookings() {
               {(selectedBooking.status === "cancelled" || selectedBooking.cancellationReason) && (
                 <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-xs space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-destructive flex items-center gap-1.5 uppercase text-[10px] tracking-wider">
+                    <span className="font-bold text-destructive flex items-center gap-1.5 text-[11px]">
                       <AlertTriangle className="h-3.5 w-3.5" />
                       Cancellation Audit Record
                     </span>
-                    <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-destructive/20 text-destructive uppercase">
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-bold bg-destructive/20 text-destructive">
                       Initiated by {selectedBooking.cancellationInitiatedBy || "LENDER"}
                     </span>
                   </div>
 
                   <div className="space-y-1.5 pt-1.5 border-t border-destructive/20">
                     <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground text-[11px]">Reason:</span>
-                      <span className="font-bold text-foreground text-[11px]">
+                      <span className="text-[var(--admin-text-muted)] text-[11px]">Reason:</span>
+                      <span className="font-bold text-[var(--admin-text)] text-[11px]">
                         {formatCancellationReason(selectedBooking.cancellationReason)}
                       </span>
                     </div>
 
                     {(selectedBooking.cancellationExplanation || selectedBooking.cancellationFeedback) && (
                       <div className="space-y-1 pt-1">
-                        <span className="text-muted-foreground text-[10px] block font-semibold">Written Explanation / Feedback:</span>
-                        <p className="p-2.5 rounded-lg bg-background/60 border border-border/40 text-[11px] text-foreground italic">
+                        <span className="text-[var(--admin-text-muted)] text-[11px] block font-semibold">Written Explanation / Feedback:</span>
+                        <p className="p-2.5 rounded-lg bg-background/60 border border-[var(--admin-border)] text-[11px] text-[var(--admin-text)]">
                           "{selectedBooking.cancellationExplanation || selectedBooking.cancellationFeedback}"
                         </p>
                       </div>
                     )}
 
-                    <div className="flex justify-between text-[10px] text-muted-foreground pt-1 border-t border-destructive/10 font-mono">
+                    <div className="flex justify-between text-[11px] text-[var(--admin-text-muted)] pt-1 border-t border-destructive/10 font-mono">
                       <span>Previous Status: {selectedBooking.cancellationPreviousStatus || "active/pending"}</span>
                       {selectedBooking.cancellationTimestamp && (
                         <span>Cancelled: {new Date(selectedBooking.cancellationTimestamp).toLocaleString()}</span>
@@ -812,54 +843,54 @@ export default function Bookings() {
               )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="p-3 rounded-xl bg-secondary/40 border border-border/60 space-y-1">
-                  <span className="text-muted-foreground text-[10px] uppercase font-bold block">Customer / Renter</span>
-                  <span className="font-bold text-foreground block">{selectedBooking.customerName}</span>
-                  <span className="text-[10px] text-muted-foreground font-mono block truncate">{selectedBooking.customerId}</span>
+                <div className="p-3 rounded-xl bg-[var(--admin-elevated)]/40 border border-[var(--admin-border)]/60 space-y-1">
+                  <span className="text-[var(--admin-text-muted)] text-[11px] font-bold block">Customer / Renter</span>
+                  <span className="font-bold text-[var(--admin-text)] block">{selectedBooking.customerName}</span>
+                  <span className="text-[11px] text-[var(--admin-text-muted)] font-mono block truncate">{selectedBooking.customerId}</span>
                 </div>
 
-                <div className="p-3 rounded-xl bg-secondary/40 border border-border/60 space-y-1">
-                  <span className="text-muted-foreground text-[10px] uppercase font-bold block">Lender / Agent</span>
-                  <span className="font-bold text-foreground block">{selectedBooking.ownerName || "Verified Lender"}</span>
-                  <span className="text-[10px] text-muted-foreground font-mono block truncate">{selectedBooking.ownerId || "—"}</span>
+                <div className="p-3 rounded-xl bg-[var(--admin-elevated)]/40 border border-[var(--admin-border)]/60 space-y-1">
+                  <span className="text-[var(--admin-text-muted)] text-[11px] font-bold block">Lender / Agent</span>
+                  <span className="font-bold text-[var(--admin-text)] block">{selectedBooking.ownerName || "Verified Lender"}</span>
+                  <span className="text-[11px] text-[var(--admin-text-muted)] font-mono block truncate">{selectedBooking.ownerId || "—"}</span>
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-secondary/40 border border-border/60 flex justify-between items-center">
-                <span className="text-muted-foreground">Total Fee</span>
-                <span className="font-mono font-black text-sm text-foreground">₹{(selectedBooking.amount || 0).toLocaleString("en-IN")}</span>
+              <div className="p-3 rounded-xl bg-[var(--admin-elevated)]/40 border border-[var(--admin-border)]/60 flex justify-between items-center">
+                <span className="text-[var(--admin-text-muted)]">Total Fee</span>
+                <span className="font-mono font-semibold tabular-nums text-sm text-[var(--admin-text)]">₹{(selectedBooking.amount || 0).toLocaleString("en-IN")}</span>
               </div>
 
               {/* Handover & Delivery Lifecycle Section */}
-              <div className="p-3.5 rounded-xl border border-border bg-card space-y-2.5">
+              <div className="p-3.5 rounded-xl border border-[var(--admin-border)] bg-[var(--admin-card)] space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Handover & Delivery Status</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 uppercase">
+                  <span className="text-[11px] font-bold text-[var(--admin-text-muted)]">Handover & Delivery Status</span>
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary border border-primary/20">
                     {(selectedBooking.deliveryStatus || "WAITING_FOR_ADMIN").replace(/_/g, " ")}
                   </span>
                 </div>
 
                 {selectedBooking.deliveryBoyName && (
-                  <div className="text-[11px] text-muted-foreground flex justify-between">
+                  <div className="text-[11px] text-[var(--admin-text-muted)] flex justify-between">
                     <span>Courier Assigned:</span>
-                    <span className="font-bold text-foreground">
+                    <span className="font-bold text-[var(--admin-text)]">
                       {selectedBooking.deliveryBoyName} ({selectedBooking.deliveryBoyPhone || "Active"})
                     </span>
                   </div>
                 )}
 
                 {/* Handover timestamps */}
-                <div className="text-[10px] text-muted-foreground space-y-1 pt-1 border-t border-border/40 font-mono">
+                <div className="text-[11px] text-[var(--admin-text-muted)] space-y-1 pt-1 border-t border-[var(--admin-border)] font-mono">
                   {selectedBooking.pickedUpAt && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Vendor Pickup Verified:</span>
-                      <span className="font-semibold text-foreground">{new Date(selectedBooking.pickedUpAt).toLocaleString()}</span>
+                      <span className="text-[var(--admin-text-muted)]">Vendor Pickup Verified:</span>
+                      <span className="font-semibold text-[var(--admin-text)]">{new Date(selectedBooking.pickedUpAt).toLocaleString()}</span>
                     </div>
                   )}
                   {selectedBooking.arrivedAtRenterAt && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Courier Arrived at Renter:</span>
-                      <span className="font-semibold text-foreground">{new Date(selectedBooking.arrivedAtRenterAt).toLocaleString()}</span>
+                      <span className="text-[var(--admin-text-muted)]">Courier Arrived at Renter:</span>
+                      <span className="font-semibold text-[var(--admin-text)]">{new Date(selectedBooking.arrivedAtRenterAt).toLocaleString()}</span>
                     </div>
                   )}
                   {selectedBooking.rentalSecurity?.renterConfirmedReceipt && (
@@ -881,7 +912,7 @@ export default function Bookings() {
                 </div>
 
                 {/* Admin Handover Dispatch Controls */}
-                <div className="flex flex-wrap gap-2 pt-2 border-t border-border/40">
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-[var(--admin-border)]">
                   {(!selectedBooking.deliveryStatus || selectedBooking.deliveryStatus === "WAITING_FOR_ADMIN") && (
                     <button
                       onClick={async () => {
@@ -927,37 +958,26 @@ export default function Bookings() {
                   )}
 
                   <button
-                    onClick={async () => {
-                      const name = prompt("Enter Delivery Courier Name:", selectedBooking.deliveryBoyName || "Express Courier");
-                      if (!name) return;
-                      const phone = prompt("Enter Courier Phone:", selectedBooking.deliveryBoyPhone || "+91 98765 43210");
-                      try {
-                        setActionLoading(true);
-                        await bookingsService.assignDelivery(selectedBooking.id, { deliveryBoyName: name, deliveryBoyPhone: phone || "" });
-                        toast.success(`Assigned courier ${name} to booking #${selectedBooking.id}.`);
-                        fetchBookings(true);
-                        setSelectedBooking((prev) => prev ? { ...prev, deliveryBoyName: name, deliveryBoyPhone: phone || "" } : null);
-                      } catch {
-                        toast.error("Failed to assign courier.");
-                      } finally {
-                        setActionLoading(false);
-                      }
+                    onClick={() => {
+                      setCourierNameInput(selectedBooking.deliveryBoyName || "");
+                      setCourierPhoneInput(selectedBooking.deliveryBoyPhone || "");
+                      setCourierModalOpen(true);
                     }}
                     disabled={actionLoading}
-                    className="px-3 py-1.5 rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-foreground text-[11px] font-bold cursor-pointer"
+                    className="px-3 py-1.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-elevated)] hover:opacity-85 text-[var(--admin-text)] text-xs font-medium cursor-pointer transition-colors"
                   >
-                    Assign Courier
+                    Assign courier
                   </button>
                 </div>
               </div>
             </div>
 
             {selectedBooking.status !== "completed" && selectedBooking.status !== "cancelled" && (
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/40">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--admin-border)]">
                 <button
                   onClick={() => handleRefund(selectedBooking.id)}
                   disabled={actionLoading}
-                  className="px-3 py-1.5 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive font-semibold text-xs transition-all cursor-pointer inline-flex items-center gap-1.5"
+                  className="px-3 py-1.5 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive font-semibold text-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
                 >
                   <XCircle className="h-3.5 w-3.5 shrink-0" />
                   <span>Refund & Cancel</span>
@@ -965,7 +985,7 @@ export default function Bookings() {
                 <button
                   onClick={() => handleComplete(selectedBooking.id)}
                   disabled={actionLoading}
-                  className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
+                  className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
                 >
                   <CheckCircle className="h-3.5 w-3.5 shrink-0" />
                   <span>Mark Completed</span>
@@ -975,6 +995,85 @@ export default function Bookings() {
           </div>
         </div>
       )}
+      <Modal
+        isOpen={courierModalOpen && !!selectedBooking}
+        onClose={() => {
+          if (actionLoading) return;
+          setCourierModalOpen(false);
+        }}
+        title="Assign delivery courier"
+        size="sm"
+      >
+        <form onSubmit={handleSaveCourier} className="p-5 space-y-4 text-xs">
+          <div className="space-y-1.5">
+            <label className="font-medium text-[var(--admin-text)] block">Courier name</label>
+            <input
+              type="text"
+              required
+              value={courierNameInput}
+              onChange={(e) => setCourierNameInput(e.target.value)}
+              placeholder="Enter courier name"
+              className="w-full px-3 py-2 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] focus:outline-none focus:border-[var(--admin-text)]/40"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="font-medium text-[var(--admin-text)] block">Courier phone</label>
+            <input
+              type="tel"
+              value={courierPhoneInput}
+              onChange={(e) => setCourierPhoneInput(e.target.value)}
+              placeholder="Contact number"
+              className="w-full px-3 py-2 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] focus:outline-none focus:border-[var(--admin-text)]/40"
+            />
+          </div>
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--admin-border)]">
+            <button
+              type="button"
+              disabled={actionLoading}
+              onClick={() => setCourierModalOpen(false)}
+              className="px-3.5 py-1.5 rounded-lg bg-[var(--admin-elevated)] text-[var(--admin-text)] border border-[var(--admin-border)] cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={actionLoading}
+              className="px-3.5 py-1.5 rounded-lg bg-[var(--admin-accent)] text-[var(--admin-bg)] font-semibold cursor-pointer disabled:opacity-50"
+            >
+              {actionLoading ? "Saving..." : "Save courier"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <ConfirmDialog
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={executeConfirmedAction}
+        title={
+          confirmAction?.type === "reset"
+            ? "Reset all bookings"
+            : confirmAction?.type === "refund"
+            ? "Refund and cancel booking"
+            : "Cancel booking"
+        }
+        description={
+          confirmAction?.type === "reset"
+            ? "This clears all booking entries from the directory."
+            : confirmAction?.type === "refund"
+            ? `Issue a refund and cancel booking #${confirmAction.id}?`
+            : `Cancel booking #${confirmAction?.id}?`
+        }
+        confirmLabel={
+          confirmAction?.type === "reset"
+            ? "Reset bookings"
+            : confirmAction?.type === "refund"
+            ? "Refund and cancel"
+            : "Cancel booking"
+        }
+        destructive
+        loading={actionLoading}
+      />
     </div>
   );
 }

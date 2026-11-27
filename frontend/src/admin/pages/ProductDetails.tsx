@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Sparkles,
   MapPin,
   Tag,
   AlertCircle,
@@ -317,8 +316,8 @@ export default function ProductDetails() {
     return (
       <div className="p-12 text-center space-y-4 max-w-md mx-auto">
         <AlertCircle className="w-12 h-12 text-destructive mx-auto" />
-        <h2 className="text-lg font-semibold text-foreground">Product Record Not Found</h2>
-        <p className="text-xs text-muted-foreground">The requested product could not be loaded from the datastore.</p>
+        <h2 className="text-lg font-semibold text-[var(--admin-text)]">Product Record Not Found</h2>
+        <p className="text-xs text-[var(--admin-text-muted)]">The requested product could not be loaded from the datastore.</p>
         <div className="flex items-center justify-center gap-3 pt-2">
           <button
             onClick={() => loadDetails()}
@@ -353,31 +352,31 @@ export default function ProductDetails() {
   ];
 
   return (
-    <div className="space-y-6 max-w-[1600px] mx-auto pb-16 px-4 sm:px-6">
+    <div className="space-y-6 max-w-[100rem] mx-auto pb-16 px-4 sm:px-6">
       {/* ─────────────────────────────────────────────────────────────
           1. HEADER & TOP BREADCRUMB
       ────────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border/80 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[var(--admin-border)] pb-4">
         <div className="flex items-center gap-3">
           <Link
             to="/admin/products"
-            className="p-2 rounded-lg bg-card border border-border/80 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            className="p-2 rounded-lg bg-[var(--admin-card)] border border-[var(--admin-border)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] transition-colors cursor-pointer"
             title="Back to Listings"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/80 font-bold">
+              <span className="text-[11px] font-mono text-[var(--admin-text-muted)] font-bold">
                 PRODUCT REVIEW
               </span>
-              <span className="text-muted-foreground/50">•</span>
-              <span className="text-[10px] font-mono text-muted-foreground">
+              <span className="text-[var(--admin-text-muted)]/50">•</span>
+              <span className="text-[11px] font-mono text-[var(--admin-text-muted)]">
                 LISTING #{product.id}
               </span>
               <span
                 className={cn(
-                  "text-[10px] font-mono font-semibold uppercase px-2 py-0.5 rounded-full border",
+                  "text-[11px] font-mono font-semibold  px-2 py-0.5 rounded-full border",
                   product.status === "approved" && "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
                   (product.status === "pending" || product.status === "under_review") && "bg-amber-500/10 text-amber-500 border-amber-500/20",
                   product.status === "rejected" && "bg-rose-500/10 text-rose-500 border-rose-500/20",
@@ -387,7 +386,7 @@ export default function ProductDetails() {
                 {product.status === "under_review" ? "Under Review" : product.status}
               </span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-foreground font-display truncate max-w-xl mt-0.5">
+            <h1 className="text-xl sm:text-2xl font-bold text-[var(--admin-text)] font-display truncate max-w-xl mt-0.5">
               {product.title}
             </h1>
           </div>
@@ -397,7 +396,7 @@ export default function ProductDetails() {
         <div className="flex items-center gap-3">
           <button
             onClick={handleOpenOwnerModal}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/80 bg-card hover:bg-muted/60 transition-colors text-xs text-foreground cursor-pointer shadow-2xs"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)] hover:bg-[var(--admin-elevated)]/60 transition-colors text-xs text-[var(--admin-text)] cursor-pointer shadow-2xs"
           >
             <ProfilePhoto
               src={product.owner?.profilePhotoUrl || (product.owner as any)?.profile_photo_url || product.owner?.avatar}
@@ -405,8 +404,8 @@ export default function ProductDetails() {
               size="xs"
               shape="circle"
             />
-            <span className="font-medium truncate max-w-[140px]">{product.owner?.name || "Lender"}</span>
-            <span className="text-[10px] font-mono uppercase px-1 rounded bg-primary/10 text-primary font-semibold">
+            <span className="font-medium truncate max-w-36">{product.owner?.name || "Lender"}</span>
+            <span className="text-[11px] font-mono px-1 rounded bg-[var(--admin-elevated)] text-[var(--admin-text)] font-semibold">
               Lender
             </span>
           </button>
@@ -419,8 +418,8 @@ export default function ProductDetails() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* ── LEFT COLUMN (2 Cols): Review Flow Navigation ── */}
         <aside className="hidden lg:block lg:col-span-2 sticky top-20 space-y-3">
-          <div className="p-4 rounded-xl border border-border/80 bg-card/60 backdrop-blur-xs space-y-3 shadow-2xs">
-            <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/80 font-bold px-1">
+          <div className="p-4 rounded-xl border border-[var(--admin-border)] bg-[var(--admin-card)] space-y-3 shadow-2xs">
+            <div className="text-[11px] font-mono text-[var(--admin-text-muted)] font-bold px-1">
               REVIEW FLOW
             </div>
             <nav className="flex flex-col space-y-1">
@@ -431,10 +430,10 @@ export default function ProductDetails() {
                     key={item.id}
                     onClick={() => scrollToSection(item.id)}
                     className={cn(
-                      "flex items-center justify-between px-3 py-2 rounded-lg text-xs font-mono transition-all text-left cursor-pointer",
+                      "flex items-center justify-between px-3 py-2 rounded-lg text-xs font-mono transition-colors text-left cursor-pointer",
                       isActive
-                        ? "bg-primary/10 text-primary font-bold border-l-2 border-primary"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                        ? "bg-[var(--admin-elevated)] text-[var(--admin-text)] font-bold border-l-2 border-primary"
+                        : "text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-elevated)]"
                     )}
                   >
                     <span>{item.label}</span>
@@ -449,43 +448,43 @@ export default function ProductDetails() {
         {/* ── MAIN REVIEW COLUMN (10 Cols): Product Information, Media, Pricing & Decision ── */}
         <main className="lg:col-span-10 space-y-6">
           {/* SECTION 01: Product Header & Hero Media */}
-          <section id="section-product" className="p-6 rounded-xl border border-border/80 bg-card space-y-6 shadow-2xs">
-            <div className="flex items-center justify-between pb-3 border-b border-border/70">
+          <section id="section-product" className="p-6 rounded-xl border border-[var(--admin-border)] bg-[var(--admin-card)] space-y-6 shadow-2xs">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--admin-border)]">
               <div>
-                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold">
+                <span className="text-[11px] font-mono text-[var(--admin-text-muted)] font-semibold">
                   01 / PRODUCT OVERVIEW
                 </span>
-                <h2 className="text-base font-semibold text-foreground mt-0.5">{product.title}</h2>
+                <h2 className="text-base font-semibold text-[var(--admin-text)] mt-0.5">{product.title}</h2>
               </div>
-              <span className="text-xs font-mono text-muted-foreground uppercase px-2.5 py-0.5 rounded bg-muted">
+              <span className="text-xs font-mono text-[var(--admin-text-muted)] px-2.5 py-0.5 rounded bg-[var(--admin-elevated)]">
                 {product.category}
               </span>
             </div>
 
             {/* Large Interactive Image Viewer */}
             <div id="section-media" className="space-y-3">
-              <div className="relative aspect-[16/10] bg-muted/40 rounded-xl overflow-hidden border border-border/80 group">
+              <div className="relative aspect-[16/10] bg-[var(--admin-elevated)] rounded-xl overflow-hidden border border-[var(--admin-border)] group">
                 {currentImage ? (
                   <img
                     src={currentImage}
                     alt={product.title}
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.01]"
+                    className="w-full h-full object-cover transition-transform duration-300"
                   />
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground/40">
+                  <div className="flex flex-col items-center justify-center h-full text-[var(--admin-text-muted)]/40">
                     <Package className="w-12 h-12" />
                     <span className="text-xs mt-2">No photo available</span>
                   </div>
                 )}
 
                 {/* Counter & Lightbox */}
-                <div className="absolute top-3 left-3 px-2 py-0.5 rounded bg-background/80 backdrop-blur-xs font-mono text-[10px] text-foreground font-semibold border border-border/60">
+                <div className="absolute top-3 left-3 px-2 py-0.5 rounded bg-black/55 font-mono text-[11px] text-[var(--admin-text)] font-semibold border border-[var(--admin-border)]">
                   {allImages.length > 0 ? `0${activeImageIndex + 1} / 0${allImages.length}` : "01 / 01"}
                 </div>
 
                 <button
                   onClick={() => setLightboxOpen(true)}
-                  className="absolute top-3 right-3 p-1.5 rounded-lg bg-background/80 hover:bg-background backdrop-blur-xs text-foreground transition-colors cursor-pointer border border-border/60"
+                  className="absolute top-3 right-3 p-1.5 rounded-lg bg-black/55 hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] transition-colors cursor-pointer border border-[var(--admin-border)]"
                   title="Fullscreen image"
                 >
                   <Maximize2 className="w-4 h-4" />
@@ -496,13 +495,13 @@ export default function ProductDetails() {
                   <>
                     <button
                       onClick={() => setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : allImages.length - 1))}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-background/80 hover:bg-background text-foreground transition-all cursor-pointer border border-border/60"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/55 hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] transition-colors cursor-pointer border border-[var(--admin-border)]"
                     >
                       <ChevronLeft className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => setActiveImageIndex((prev) => (prev < allImages.length - 1 ? prev + 1 : 0))}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-background/80 hover:bg-background text-foreground transition-all cursor-pointer border border-border/60"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/55 hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] transition-colors cursor-pointer border border-[var(--admin-border)]"
                     >
                       <ChevronRight className="w-4 h-4" />
                     </button>
@@ -518,8 +517,8 @@ export default function ProductDetails() {
                       key={idx}
                       onClick={() => setActiveImageIndex(idx)}
                       className={cn(
-                        "w-16 h-12 rounded-lg overflow-hidden border shrink-0 transition-all cursor-pointer relative",
-                        activeImageIndex === idx ? "border-primary ring-2 ring-primary/20" : "border-border/70 opacity-70 hover:opacity-100"
+                        "w-16 h-12 rounded-lg overflow-hidden border shrink-0 transition-colors cursor-pointer relative",
+                        activeImageIndex === idx ? "border-primary ring-2 ring-primary/20" : "border-[var(--admin-border)] opacity-70 hover:opacity-100"
                       )}
                     >
                       <img src={imgUrl} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
@@ -529,14 +528,14 @@ export default function ProductDetails() {
               )}
 
               {/* 10-Second Condition Video Trigger */}
-              <div className="p-3.5 rounded-xl border border-border/80 bg-muted/30 flex items-center justify-between gap-3">
+              <div className="p-3.5 rounded-xl border border-[var(--admin-border)] bg-[var(--admin-elevated)]/30 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <div className="w-9 h-9 rounded-lg bg-[var(--admin-elevated)] text-[var(--admin-text)] flex items-center justify-center shrink-0">
                     <Film className="w-4 h-4" />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-xs font-semibold text-foreground">10-Second Inspection Video</span>
-                    <span className="text-[11px] text-muted-foreground">
+                    <span className="text-xs font-semibold text-[var(--admin-text)]">10-Second Inspection Video</span>
+                    <span className="text-[11px] text-[var(--admin-text-muted)]">
                       {effectiveVideoUrl ? "Lender uploaded physical equipment condition video" : "No separate video uploaded; verified via multi-angle photos"}
                     </span>
                   </div>
@@ -551,7 +550,7 @@ export default function ProductDetails() {
                     <span>PLAY VIDEO</span>
                   </button>
                 ) : (
-                  <span className="text-[10px] font-mono uppercase text-muted-foreground px-2 py-1 rounded bg-muted">
+                  <span className="text-[11px] font-mono text-[var(--admin-text-muted)] px-2 py-1 rounded bg-[var(--admin-elevated)]">
                     N/A
                   </span>
                 )}
@@ -560,42 +559,42 @@ export default function ProductDetails() {
 
             {/* Structured Specifications Grid */}
             <div className="space-y-3 pt-2">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-bold block">
+              <span className="text-[11px] font-mono text-[var(--admin-text-muted)] font-bold block">
                 PRODUCT SPECIFICATIONS
               </span>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs font-mono">
-                <div className="p-3 rounded-lg border border-border/70 bg-card/60">
-                  <span className="text-[10px] uppercase text-muted-foreground block">BRAND</span>
-                  <span className="font-semibold text-foreground mt-0.5 block">{product.brand || "—"}</span>
+                <div className="p-3 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)]">
+                  <span className="text-[11px] text-[var(--admin-text-muted)] block">Brand</span>
+                  <span className="font-semibold text-[var(--admin-text)] mt-0.5 block">{product.brand || "—"}</span>
                 </div>
-                <div className="p-3 rounded-lg border border-border/70 bg-card/60">
-                  <span className="text-[10px] uppercase text-muted-foreground block">MODEL</span>
-                  <span className="font-semibold text-foreground mt-0.5 block">{product.model || "—"}</span>
+                <div className="p-3 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)]">
+                  <span className="text-[11px] text-[var(--admin-text-muted)] block">Model</span>
+                  <span className="font-semibold text-[var(--admin-text)] mt-0.5 block">{product.model || "—"}</span>
                 </div>
-                <div className="p-3 rounded-lg border border-border/70 bg-card/60">
-                  <span className="text-[10px] uppercase text-muted-foreground block">YEAR / AGE</span>
-                  <span className="font-semibold text-foreground mt-0.5 block">{product.year || "—"}</span>
+                <div className="p-3 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)]">
+                  <span className="text-[11px] text-[var(--admin-text-muted)] block">Year / age</span>
+                  <span className="font-semibold text-[var(--admin-text)] mt-0.5 block">{product.year || "—"}</span>
                 </div>
-                <div className="p-3 rounded-lg border border-border/70 bg-card/60">
-                  <span className="text-[10px] uppercase text-muted-foreground block">CATEGORY</span>
-                  <span className="font-semibold text-foreground mt-0.5 block">{product.category}</span>
+                <div className="p-3 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)]">
+                  <span className="text-[11px] text-[var(--admin-text-muted)] block">Category</span>
+                  <span className="font-semibold text-[var(--admin-text)] mt-0.5 block">{product.category}</span>
                 </div>
-                <div className="p-3 rounded-lg border border-border/70 bg-card/60">
-                  <span className="text-[10px] uppercase text-muted-foreground block">SUBMISSION DATE</span>
-                  <span className="font-semibold text-foreground mt-0.5 block">
+                <div className="p-3 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)]">
+                  <span className="text-[11px] text-[var(--admin-text-muted)] block">Submission date</span>
+                  <span className="font-semibold text-[var(--admin-text)] mt-0.5 block">
                     {new Date(product.createdAt).toLocaleDateString("en-IN")}
                   </span>
                 </div>
-                <div className="p-3 rounded-lg border border-border/70 bg-card/60">
-                  <span className="text-[10px] uppercase text-muted-foreground block">PRODUCT ID</span>
-                  <span className="font-semibold text-foreground mt-0.5 block truncate">{product.id}</span>
+                <div className="p-3 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)]">
+                  <span className="text-[11px] text-[var(--admin-text-muted)] block">Product ID</span>
+                  <span className="font-semibold text-[var(--admin-text)] mt-0.5 block truncate">{product.id}</span>
                 </div>
               </div>
 
               {/* Description */}
-              <div className="p-4 rounded-lg border border-border/70 bg-muted/20 space-y-1">
-                <span className="text-[10px] font-mono uppercase text-muted-foreground font-semibold">DESCRIPTION</span>
-                <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">
+              <div className="p-4 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-elevated)]/20 space-y-1">
+                <span className="text-[11px] font-mono text-[var(--admin-text-muted)] font-semibold">Description</span>
+                <p className="text-xs text-[var(--admin-text)] leading-relaxed whitespace-pre-wrap">
                   {product.description || "No description provided by lender."}
                 </p>
               </div>
@@ -603,26 +602,26 @@ export default function ProductDetails() {
           </section>
 
           {/* SECTION 03: Condition & Accessories */}
-          <section id="section-condition" className="p-6 rounded-xl border border-border/80 bg-card space-y-4 shadow-2xs">
-            <div className="flex items-center justify-between pb-3 border-b border-border/70">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold">
+          <section id="section-condition" className="p-6 rounded-xl border border-[var(--admin-border)] bg-[var(--admin-card)] space-y-4 shadow-2xs">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--admin-border)]">
+              <span className="text-[11px] font-mono text-[var(--admin-text-muted)] font-semibold">
                 03 / PHYSICAL CONDITION &amp; ACCESSORIES
               </span>
-              <span className="text-xs font-mono font-bold text-emerald-500 uppercase px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20">
+              <span className="text-xs font-mono font-bold text-emerald-500 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20">
                 Grade: {product.conditionGrade || "Excellent"}
               </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
-              <div className="p-3.5 rounded-lg border border-border/70 bg-card/60 space-y-1">
-                <span className="text-[10px] uppercase text-muted-foreground">REPORTED DAMAGE</span>
-                <span className="text-foreground font-semibold block">
+              <div className="p-3.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)] space-y-1">
+                <span className="text-[11px] text-[var(--admin-text-muted)]">Reported damage</span>
+                <span className="text-[var(--admin-text)] font-semibold block">
                   {product.conditionDetails?.damageDescription || "No visible or mechanical damage reported."}
                 </span>
               </div>
-              <div className="p-3.5 rounded-lg border border-border/70 bg-card/60 space-y-1">
-                <span className="text-[10px] uppercase text-muted-foreground">INCLUDED ACCESSORIES</span>
-                <span className="text-foreground font-semibold block">
+              <div className="p-3.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)] space-y-1">
+                <span className="text-[11px] text-[var(--admin-text-muted)]">Included accessories</span>
+                <span className="text-[var(--admin-text)] font-semibold block">
                   {product.accessories || "Standard manufacturer accessories included."}
                 </span>
               </div>
@@ -631,14 +630,14 @@ export default function ProductDetails() {
             {/* Verification Documents */}
             {product.documents && product.documents.length > 0 && (
               <div className="pt-2">
-                <span className="text-[10px] font-mono uppercase text-muted-foreground font-semibold block mb-2">
+                <span className="text-[11px] font-mono text-[var(--admin-text-muted)] font-semibold block mb-2">
                   VERIFICATION PROOFS
                 </span>
                 <div className="flex flex-wrap gap-2">
                   {product.documents.map((doc, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/80 bg-muted/40 text-xs font-mono text-foreground"
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-elevated)] text-xs font-mono text-[var(--admin-text)]"
                     >
                       <FileCheck className="w-3.5 h-3.5 text-emerald-500" />
                       <span>{doc}</span>
@@ -650,72 +649,72 @@ export default function ProductDetails() {
           </section>
 
           {/* SECTION 04: Availability & Schedule */}
-          <section id="section-availability" className="p-6 rounded-xl border border-border/80 bg-card space-y-4 shadow-2xs">
-            <div className="flex items-center justify-between pb-3 border-b border-border/70">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold">
+          <section id="section-availability" className="p-6 rounded-xl border border-[var(--admin-border)] bg-[var(--admin-card)] space-y-4 shadow-2xs">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--admin-border)]">
+              <span className="text-[11px] font-mono text-[var(--admin-text-muted)] font-semibold">
                 04 / AVAILABILITY &amp; LOGISTICS
               </span>
-              <span className="text-xs font-mono text-muted-foreground uppercase">
+              <span className="text-xs font-mono text-[var(--admin-text-muted)]">
                 Status: {product.available ? "Ready for Rental" : "Pending Verification"}
               </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
-              <div className="p-3 rounded-lg border border-border/70 bg-card/60">
-                <span className="text-[10px] uppercase text-muted-foreground block">SCHEDULE TYPE</span>
-                <span className="font-semibold text-foreground mt-0.5 block">Always Available</span>
+              <div className="p-3 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)]">
+                <span className="text-[11px] text-[var(--admin-text-muted)] block">Schedule type</span>
+                <span className="font-semibold text-[var(--admin-text)] mt-0.5 block">Always Available</span>
               </div>
-              <div className="p-3 rounded-lg border border-border/70 bg-card/60">
-                <span className="text-[10px] uppercase text-muted-foreground block">MIN RENTAL DURATION</span>
-                <span className="font-semibold text-foreground mt-0.5 block">{product.minRentalDays || 1} Day(s)</span>
+              <div className="p-3 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)]">
+                <span className="text-[11px] text-[var(--admin-text-muted)] block">Minimum rental duration</span>
+                <span className="font-semibold text-[var(--admin-text)] mt-0.5 block">{product.minRentalDays || 1} Day(s)</span>
               </div>
-              <div className="p-3 rounded-lg border border-border/70 bg-card/60">
-                <span className="text-[10px] uppercase text-muted-foreground block">MAX RENTAL DURATION</span>
-                <span className="font-semibold text-foreground mt-0.5 block">{product.maxRentalDays || 30} Day(s)</span>
+              <div className="p-3 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)]">
+                <span className="text-[11px] text-[var(--admin-text-muted)] block">Maximum rental duration</span>
+                <span className="font-semibold text-[var(--admin-text)] mt-0.5 block">{product.maxRentalDays || 30} Day(s)</span>
               </div>
             </div>
           </section>
 
           {/* SECTION 05: Location Details */}
-          <section id="section-location" className="p-6 rounded-xl border border-border/80 bg-card space-y-4 shadow-2xs">
-            <div className="flex items-center justify-between pb-3 border-b border-border/70">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold">
+          <section id="section-location" className="p-6 rounded-xl border border-[var(--admin-border)] bg-[var(--admin-card)] space-y-4 shadow-2xs">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--admin-border)]">
+              <span className="text-[11px] font-mono text-[var(--admin-text-muted)] font-semibold">
                 05 / LISTING LOCATION
               </span>
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
+              <div className="flex items-center gap-1.5 text-xs text-[var(--admin-text-muted)] font-mono">
                 <MapPin className="w-3.5 h-3.5 text-primary" />
                 <span>{product.city || "Bangalore"}, {product.pincode || "560001"}</span>
               </div>
             </div>
 
-            <div className="p-4 rounded-lg border border-border/70 bg-muted/20 text-xs font-mono space-y-2">
+            <div className="p-4 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-elevated)]/20 text-xs font-mono space-y-2">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">LOCALITY / AREA:</span>
-                <span className="font-semibold text-foreground">{product.area || "Central Hub"}</span>
+                <span className="text-[var(--admin-text-muted)]">LOCALITY / AREA:</span>
+                <span className="font-semibold text-[var(--admin-text)]">{product.area || "Central Hub"}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">CITY &amp; PINCODE:</span>
-                <span className="font-semibold text-foreground">{product.city || "Bangalore"} &bull; {product.pincode || "560001"}</span>
+                <span className="text-[var(--admin-text-muted)]">CITY &amp; PINCODE:</span>
+                <span className="font-semibold text-[var(--admin-text)]">{product.city || "Bangalore"} &bull; {product.pincode || "560001"}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">PICKUP INSTRUCTIONS:</span>
-                <span className="font-semibold text-foreground">{product.pickupInstructions || "Secure lender handover upon OTP / PIN validation."}</span>
+                <span className="text-[var(--admin-text-muted)]">PICKUP INSTRUCTIONS:</span>
+                <span className="font-semibold text-[var(--admin-text)]">{product.pickupInstructions || "Secure lender handover upon OTP / PIN validation."}</span>
               </div>
             </div>
           </section>
 
           {/* SECTION 06: Admin Price Setting (Bottom Full-Width Placement) */}
-          <section id="section-pricing" className="p-6 rounded-xl border border-border/80 bg-card space-y-5 shadow-2xs">
-            <div className="flex items-center justify-between pb-3 border-b border-border/70">
+          <section id="section-pricing" className="p-6 rounded-xl border border-[var(--admin-border)] bg-[var(--admin-card)] space-y-5 shadow-2xs">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--admin-border)]">
               <div>
-                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold">
+                <span className="text-[11px] font-mono text-[var(--admin-text-muted)] font-semibold">
                   06 / RENTAL PRICE CONFIGURATION
                 </span>
-                <h2 className="text-base font-semibold text-foreground mt-0.5">Approved Rental Price</h2>
+                <h2 className="text-base font-semibold text-[var(--admin-text)] mt-0.5">Approved Rental Price</h2>
               </div>
               {isPriceDirty && (
-                <span className="text-[10px] font-mono font-semibold uppercase px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse">
-                  Unsaved Changes
+                <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                  Unsaved changes
                 </span>
               )}
             </div>
@@ -723,12 +722,12 @@ export default function ProductDetails() {
             <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-end">
               {/* Rental Price Field */}
               <div className="md:col-span-6 space-y-1.5">
-                <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground font-semibold flex items-center justify-between">
-                  <span>RENTAL PRICE</span>
-                  <span className="text-[10px] text-muted-foreground/60 font-normal">Fixed Rate</span>
+                <label className="text-xs font-mono text-[var(--admin-text-muted)] font-semibold flex items-center justify-between">
+                  <span>Rental price</span>
+                  <span className="text-[11px] text-[var(--admin-text-muted)] font-normal">Fixed Rate</span>
                 </label>
                 <div className="relative flex items-center">
-                  <span className="absolute left-3.5 text-base font-bold font-mono text-muted-foreground select-none">₹</span>
+                  <span className="absolute left-3.5 text-base font-bold font-mono text-[var(--admin-text-muted)] select-none">₹</span>
                   <input
                     type="number"
                     min="1"
@@ -739,15 +738,15 @@ export default function ProductDetails() {
                       setIsPriceDirty(true);
                     }}
                     placeholder="1000"
-                    className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-border/80 bg-background font-mono text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                    className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-elevated)] font-mono text-sm font-bold text-[var(--admin-text)] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
                   />
                 </div>
-                <p className="text-[11px] text-muted-foreground">The fixed rental rate for customers on the marketplace.</p>
+                <p className="text-[11px] text-[var(--admin-text-muted)]">The fixed rental rate for customers on the marketplace.</p>
               </div>
 
               {/* Price Unit */}
               <div className="md:col-span-3 space-y-1.5">
-                <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground font-semibold">
+                <label className="text-xs font-mono text-[var(--admin-text-muted)] font-semibold">
                   PRICE UNIT
                 </label>
                 <select
@@ -756,7 +755,7 @@ export default function ProductDetails() {
                     setPriceUnit(e.target.value as PriceUnitType);
                     setIsPriceDirty(true);
                   }}
-                  className="w-full px-3 py-2.5 rounded-lg border border-border/80 bg-background font-mono text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer transition-all"
+                  className="w-full px-3 py-2.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-elevated)] font-mono text-xs font-semibold text-[var(--admin-text)] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer transition-colors"
                 >
                   {PRICE_UNITS.map((u) => (
                     <option key={u.value} value={u.value}>
@@ -764,7 +763,7 @@ export default function ProductDetails() {
                     </option>
                   ))}
                 </select>
-                <p className="text-[11px] text-muted-foreground">Billing interval</p>
+                <p className="text-[11px] text-[var(--admin-text-muted)]">Billing interval</p>
               </div>
 
               {/* Save Price Button */}
@@ -773,10 +772,10 @@ export default function ProductDetails() {
                   onClick={handleSavePrice}
                   disabled={!isPriceValid || isSavingPrice}
                   className={cn(
-                    "w-full py-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-2xs cursor-pointer",
+                    "w-full py-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-colors shadow-2xs cursor-pointer",
                     isPriceValid && !isSavingPrice
                       ? "bg-foreground text-background hover:opacity-90"
-                      : "bg-muted text-muted-foreground cursor-not-allowed opacity-60"
+                      : "bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] cursor-not-allowed opacity-60"
                   )}
                 >
                   {isSavingPrice ? (
@@ -793,7 +792,7 @@ export default function ProductDetails() {
                     <span>SAVE PRICE</span>
                   )}
                 </button>
-                <div className="hidden md:block h-[18px]" />
+                <div className="hidden md:block h-5" />
               </div>
             </div>
 
@@ -804,7 +803,7 @@ export default function ProductDetails() {
                   "p-2.5 rounded-lg border text-xs font-mono flex items-center gap-2 flex-1",
                   validationMessage.type === "error" && "bg-rose-500/10 border-rose-500/20 text-rose-500",
                   validationMessage.type === "success" && "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400",
-                  validationMessage.type === "info" && "bg-muted/40 border-border/70 text-muted-foreground"
+                  validationMessage.type === "info" && "bg-[var(--admin-elevated)] border-[var(--admin-border)] text-[var(--admin-text-muted)]"
                 )}
               >
                 {validationMessage.type === "error" ? (
@@ -818,8 +817,8 @@ export default function ProductDetails() {
               </div>
 
               {isPriceValid && (
-                <div className="px-4 py-2 rounded-lg border border-border/80 bg-muted/20 flex items-center gap-2 font-mono text-xs shrink-0">
-                  <span className="text-muted-foreground">APPROVED RATE:</span>
+                <div className="px-4 py-2 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-elevated)]/20 flex items-center gap-2 font-mono text-xs shrink-0">
+                  <span className="text-[var(--admin-text-muted)]">APPROVED RATE:</span>
                   <span className="font-bold text-emerald-600 dark:text-emerald-400">
                     ₹{singleNum.toLocaleString("en-IN")} {unitDisplay}
                   </span>
@@ -829,18 +828,18 @@ export default function ProductDetails() {
 
             {/* Price History Record */}
             {product.priceHistory && product.priceHistory.length > 0 && (
-              <div className="pt-3 border-t border-border/70 space-y-2">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+              <div className="pt-3 border-t border-[var(--admin-border)] space-y-2">
+                <span className="text-[11px] font-mono text-[var(--admin-text-muted)] font-semibold flex items-center gap-1">
                   <History className="w-3 h-3" /> Price History
                 </span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                   {product.priceHistory.map((item, i) => (
-                    <div key={item.id || i} className="p-2.5 rounded-lg bg-muted/40 border border-border/60 text-[10px] font-mono space-y-0.5">
-                      <div className="flex justify-between font-semibold text-foreground">
+                    <div key={item.id || i} className="p-2.5 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[11px] font-mono space-y-0.5">
+                      <div className="flex justify-between font-semibold text-[var(--admin-text)]">
                         <span>₹{item.minPrice === item.maxPrice ? item.minPrice : `${item.minPrice} — ${item.maxPrice}`} /{item.unit}</span>
-                        <span className="text-muted-foreground/70">{new Date(item.updatedAt).toLocaleDateString("en-IN")}</span>
+                        <span className="text-[var(--admin-text-muted)]/70">{new Date(item.updatedAt).toLocaleDateString("en-IN")}</span>
                       </div>
-                      <span className="text-muted-foreground block text-[9px]">by {item.updatedBy}</span>
+                      <span className="text-[var(--admin-text-muted)] block text-[11px]">by {item.updatedBy}</span>
                     </div>
                   ))}
                 </div>
@@ -849,15 +848,15 @@ export default function ProductDetails() {
           </section>
 
           {/* SECTION 07: Admin Moderation Decision Actions (Bottom Action Bar) */}
-          <section id="section-decision" className="p-6 rounded-xl border border-border/80 bg-card space-y-4 shadow-2xs">
-            <div className="flex items-center justify-between pb-3 border-b border-border/70">
+          <section id="section-decision" className="p-6 rounded-xl border border-[var(--admin-border)] bg-[var(--admin-card)] space-y-4 shadow-2xs">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--admin-border)]">
               <div>
-                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold">
+                <span className="text-[11px] font-mono text-[var(--admin-text-muted)] font-semibold">
                   07 / MODERATION DECISION
                 </span>
-                <h2 className="text-base font-semibold text-foreground mt-0.5">Final Decision Actions</h2>
+                <h2 className="text-base font-semibold text-[var(--admin-text)] mt-0.5">Final Decision Actions</h2>
               </div>
-              <span className="text-xs font-mono text-muted-foreground">
+              <span className="text-xs font-mono text-[var(--admin-text-muted)]">
                 Listing #{product.id}
               </span>
             </div>
@@ -868,14 +867,14 @@ export default function ProductDetails() {
                 onClick={() => setApproveModalOpen(true)}
                 disabled={!isPriceValid || isSubmittingAction}
                 className={cn(
-                  "py-3 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer",
+                  "py-3 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors shadow-xs cursor-pointer",
                   isPriceValid && !isSubmittingAction
                     ? "bg-emerald-500 hover:bg-emerald-600 text-black shadow-emerald-500/20"
-                    : "bg-muted text-muted-foreground opacity-60 cursor-not-allowed"
+                    : "bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] opacity-60 cursor-not-allowed"
                 )}
               >
                 <CheckCircle2 className="w-4 h-4" />
-                <span>APPROVE PRODUCT</span>
+                <span>Approve product</span>
               </button>
 
               {/* Secondary: Request Revision */}
@@ -885,7 +884,7 @@ export default function ProductDetails() {
                 className="py-3 px-4 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
               >
                 <RotateCcw className="w-4 h-4" />
-                <span>REQUEST REVISION</span>
+                <span>Request revision</span>
               </button>
 
               {/* Danger: Reject Listing */}
@@ -895,7 +894,7 @@ export default function ProductDetails() {
                 className="py-3 px-4 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
               >
                 <XCircle className="w-4 h-4" />
-                <span>REJECT PRODUCT</span>
+                <span>Reject product</span>
               </button>
             </div>
           </section>
@@ -906,26 +905,26 @@ export default function ProductDetails() {
           3. APPROVAL CONFIRMATION MODAL
       ────────────────────────────────────────────────────────────── */}
       {approveModalOpen && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-card border border-border/80 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 bg-black/55 flex items-center justify-center p-4 z-50">
+          <div className="bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-5">
             <div className="flex items-center gap-3 text-emerald-500">
               <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
                 <CheckCircle2 className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-foreground font-display">Approve Listing?</h3>
-                <p className="text-xs text-muted-foreground truncate max-w-xs">{product.title}</p>
+                <h3 className="text-base font-bold text-[var(--admin-text)] font-display">Approve Listing?</h3>
+                <p className="text-xs text-[var(--admin-text-muted)] truncate max-w-xs">{product.title}</p>
               </div>
             </div>
 
-            <div className="p-4 rounded-xl bg-muted/40 border border-border/70 space-y-2 font-mono text-xs">
+            <div className="p-4 rounded-xl bg-[var(--admin-elevated)] border border-[var(--admin-border)] space-y-2 font-mono text-xs">
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">APPROVED RENTAL PRICE:</span>
+                <span className="text-[var(--admin-text-muted)]">Approved rental price:</span>
                 <span className="font-bold text-emerald-600 dark:text-emerald-400">
                   ₹{singleNum.toLocaleString("en-IN")} {unitDisplay}
                 </span>
               </div>
-              <p className="text-[11px] text-muted-foreground font-sans pt-1 leading-relaxed">
+              <p className="text-[11px] text-[var(--admin-text-muted)] font-sans pt-1 leading-relaxed">
                 Once approved, this listing will be published to the catalog at this approved rental price.
               </p>
             </div>
@@ -933,14 +932,14 @@ export default function ProductDetails() {
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 onClick={() => setApproveModalOpen(false)}
-                className="px-4 py-2 rounded-lg border border-border/80 text-xs font-semibold text-muted-foreground hover:text-foreground cursor-pointer"
+                className="px-4 py-2 rounded-lg border border-[var(--admin-border)] text-xs font-semibold text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmApprove}
                 disabled={isSubmittingAction}
-                className="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-black text-xs font-bold transition-all cursor-pointer shadow-xs"
+                className="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-black text-xs font-bold transition-colors cursor-pointer shadow-xs"
               >
                 {isSubmittingAction ? "Approving..." : "Approve Listing"}
               </button>
@@ -953,45 +952,45 @@ export default function ProductDetails() {
           4. REQUEST REVISION MODAL
       ────────────────────────────────────────────────────────────── */}
       {revisionModalOpen && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-card border border-border/80 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 bg-black/55 flex items-center justify-center p-4 z-50">
+          <div className="bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-amber-500">
                 <RotateCcw className="w-5 h-5" />
-                <h3 className="text-base font-bold text-foreground">Request Product Revision</h3>
+                <h3 className="text-base font-bold text-[var(--admin-text)]">Request Product Revision</h3>
               </div>
               <button
                 onClick={() => setRevisionModalOpen(false)}
-                className="p-1 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
+                className="p-1 rounded-lg text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-[var(--admin-text-muted)]">
               Provide specific guidance on what photos, specifications, or details the lender needs to update.
             </p>
 
             <div className="space-y-3 font-mono text-xs">
               <div className="space-y-1">
-                <label className="text-[10px] uppercase text-muted-foreground font-semibold">REVISION TOPIC</label>
+                <label className="text-[11px] text-[var(--admin-text-muted)] font-semibold">Revision topic</label>
                 <input
                   type="text"
                   value={revisionReason}
                   onChange={(e) => setRevisionReason(e.target.value)}
                   placeholder="e.g. Serial photo unclear"
-                  className="w-full px-3 py-2 rounded-lg border border-border/80 bg-background text-foreground text-xs"
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] uppercase text-muted-foreground font-semibold">REQUIRED CHANGES</label>
+                <label className="text-[11px] text-[var(--admin-text-muted)] font-semibold">Required changes</label>
                 <textarea
                   rows={3}
                   value={revisionChanges}
                   onChange={(e) => setRevisionChanges(e.target.value)}
                   placeholder="Please re-upload a clear photo of the bottom serial number sticker and clarify included accessories."
-                  className="w-full px-3 py-2 rounded-lg border border-border/80 bg-background text-foreground text-xs"
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs"
                 />
               </div>
             </div>
@@ -999,14 +998,14 @@ export default function ProductDetails() {
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 onClick={() => setRevisionModalOpen(false)}
-                className="px-4 py-2 rounded-lg border border-border/80 text-xs font-semibold text-muted-foreground hover:text-foreground cursor-pointer"
+                className="px-4 py-2 rounded-lg border border-[var(--admin-border)] text-xs font-semibold text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmRevision}
                 disabled={isSubmittingAction}
-                className="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-black text-xs font-bold transition-all cursor-pointer"
+                className="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-black text-xs font-bold transition-colors cursor-pointer"
               >
                 {isSubmittingAction ? "Sending..." : "Send Revision Request"}
               </button>
@@ -1019,47 +1018,47 @@ export default function ProductDetails() {
           5. REJECT LISTING MODAL
       ────────────────────────────────────────────────────────────── */}
       {rejectModalOpen && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-card border border-border/80 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 bg-black/55 flex items-center justify-center p-4 z-50">
+          <div className="bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-rose-500">
                 <XCircle className="w-5 h-5" />
-                <h3 className="text-base font-bold text-foreground">Reject Listing?</h3>
+                <h3 className="text-base font-bold text-[var(--admin-text)]">Reject Listing?</h3>
               </div>
               <button
                 onClick={() => setRejectModalOpen(false)}
-                className="p-1 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
+                className="p-1 rounded-lg text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-muted-foreground">
-              Explain why this listing cannot be approved on the paye₹nt platform.
+            <p className="text-xs text-[var(--admin-text-muted)]">
+              Explain why this listing cannot be approved on the Payent platform.
             </p>
 
             <div className="space-y-1 font-mono text-xs">
-              <label className="text-[10px] uppercase text-muted-foreground font-semibold">REASON FOR REJECTION</label>
+              <label className="text-[11px] text-[var(--admin-text-muted)] font-semibold">Rejection reason</label>
               <textarea
                 rows={3}
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
                 placeholder="Product does not meet marketplace authenticity or safety standards."
-                className="w-full px-3 py-2 rounded-lg border border-border/80 bg-background text-foreground text-xs"
+                className="w-full px-3 py-2 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs"
               />
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 onClick={() => setRejectModalOpen(false)}
-                className="px-4 py-2 rounded-lg border border-border/80 text-xs font-semibold text-muted-foreground hover:text-foreground cursor-pointer"
+                className="px-4 py-2 rounded-lg border border-[var(--admin-border)] text-xs font-semibold text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmReject}
                 disabled={isSubmittingAction}
-                className="px-5 py-2 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold transition-all cursor-pointer"
+                className="px-5 py-2 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold transition-colors cursor-pointer"
               >
                 {isSubmittingAction ? "Rejecting..." : "Reject Listing"}
               </button>
@@ -1096,10 +1095,10 @@ export default function ProductDetails() {
           7. VIDEO INSPECTION MODAL
       ────────────────────────────────────────────────────────────── */}
       {videoModalOpen && effectiveVideoUrl && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-card border border-border/80 rounded-2xl p-6 max-w-2xl w-full shadow-2xl space-y-4">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-2xl p-6 max-w-2xl w-full shadow-2xl space-y-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-foreground font-semibold">
+              <div className="flex items-center gap-2 text-[var(--admin-text)] font-semibold">
                 <Film className="w-5 h-5 text-primary" />
                 <span>10-Second Equipment Condition Video</span>
               </div>
@@ -1108,7 +1107,7 @@ export default function ProductDetails() {
                   setVideoModalOpen(false);
                   setVideoLoadError(false);
                 }}
-                className="p-1 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
+                className="p-1 rounded-lg text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1175,7 +1174,7 @@ export default function ProductDetails() {
               )}
             </div>
 
-            <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t border-border/60">
+            <div className="flex items-center justify-between text-xs text-[var(--admin-text-muted)] pt-1 border-t border-[var(--admin-border)]">
               <span className="font-mono text-[11px] truncate max-w-xs sm:max-w-md">
                 URL: {effectiveVideoUrl}
               </span>
@@ -1196,9 +1195,9 @@ export default function ProductDetails() {
           8. OWNER KYC / PROFILE MODAL
       ────────────────────────────────────────────────────────────── */}
       {ownerModalOpen && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-card border border-border/80 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-border/70">
+        <div className="fixed inset-0 bg-black/55 flex items-center justify-center p-4 z-50">
+          <div className="bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--admin-border)]">
               <div className="flex items-center gap-3">
                 <ProfilePhoto
                   src={product.owner?.profilePhotoUrl || (product.owner as any)?.profile_photo_url || product.owner?.avatar}
@@ -1208,13 +1207,13 @@ export default function ProductDetails() {
                   className="border border-border"
                 />
                 <div>
-                  <h3 className="text-base font-bold text-foreground font-display">{product.owner?.name || "Lender Profile"}</h3>
-                  <span className="text-[10px] font-mono text-muted-foreground uppercase">{product.owner?.email}</span>
+                  <h3 className="text-base font-bold text-[var(--admin-text)] font-display">{product.owner?.name || "Lender Profile"}</h3>
+                  <span className="text-[11px] font-mono text-[var(--admin-text-muted)]">{product.owner?.email}</span>
                 </div>
               </div>
               <button
                 onClick={() => setOwnerModalOpen(false)}
-                className="p-1 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
+                className="p-1 rounded-lg text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1226,26 +1225,26 @@ export default function ProductDetails() {
               </div>
             ) : (
               <div className="space-y-3 font-mono text-xs">
-                <div className="p-3 rounded-lg border border-border/70 bg-muted/20 space-y-1">
+                <div className="p-3 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-elevated)]/20 space-y-1">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">PHONE:</span>
-                    <span className="font-semibold text-foreground">{product.owner?.phone || "+91 98765 43210"}</span>
+                    <span className="text-[var(--admin-text-muted)]">Phone:</span>
+                    <span className="font-semibold text-[var(--admin-text)]">{product.owner?.phone || "Not provided"}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">LOCATION:</span>
-                    <span className="font-semibold text-foreground">{product.city || "Bangalore"}, {product.pincode || "560001"}</span>
+                    <span className="text-[var(--admin-text-muted)]">LOCATION:</span>
+                    <span className="font-semibold text-[var(--admin-text)]">{product.city || "Bangalore"}, {product.pincode || "560001"}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">AADHAAR KYC:</span>
+                    <span className="text-[var(--admin-text-muted)]">AADHAAR KYC:</span>
                     <span className="text-emerald-500 font-bold flex items-center gap-1">
                       <ShieldCheck className="w-3.5 h-3.5" /> VERIFIED
                     </span>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between p-3 rounded-lg border border-border/70 bg-card/60">
-                  <span className="text-muted-foreground">LENDER RATING:</span>
-                  <span className="font-bold text-foreground">★ {product.owner?.rating || "5.0"}</span>
+                <div className="flex items-center justify-between p-3 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)]">
+                  <span className="text-[var(--admin-text-muted)]">LENDER RATING:</span>
+                  <span className="font-bold text-[var(--admin-text)]">★ {product.owner?.rating || "5.0"}</span>
                 </div>
               </div>
             )}
@@ -1253,7 +1252,7 @@ export default function ProductDetails() {
             <div className="flex justify-end pt-2">
               <button
                 onClick={() => setOwnerModalOpen(false)}
-                className="px-4 py-2 rounded-lg bg-muted text-xs font-semibold text-foreground hover:bg-muted/80 cursor-pointer"
+                className="px-4 py-2 rounded-lg bg-[var(--admin-elevated)] text-xs font-semibold text-[var(--admin-text)] hover:bg-[var(--admin-elevated)]/80 cursor-pointer"
               >
                 Close
               </button>

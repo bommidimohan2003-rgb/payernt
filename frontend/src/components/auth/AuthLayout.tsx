@@ -42,7 +42,7 @@ export function AuthLayout({
             <div className="lg:col-span-6 xl:col-span-6 flex justify-center lg:justify-end">
               <div
                 className={cn(
-                  "relative w-full p-5 sm:p-6.5 shadow-xl border border-neutral-300/80 bg-card/95 dark:bg-[#1E1E1E] dark:border-neutral-700/80 backdrop-blur-2xl rounded-2xl space-y-3.5 sm:space-y-4 transition-all duration-300 pt-5 sm:pt-6",
+                  "relative w-full p-4.5 sm:p-5.5 shadow-xl border border-neutral-300/80 bg-card/95 dark:bg-[#1E1E1E] dark:border-neutral-700/80 backdrop-blur-2xl rounded-2xl space-y-3 transition-all duration-300 pt-4.5 sm:pt-5",
                   mode === "register" ? "max-w-lg" : "max-w-[420px]",
                 )}
               >
@@ -59,7 +59,7 @@ export function AuthLayout({
                 </div>
 
                 {/* Form Heading Subtitle */}
-                <div className="space-y-1 text-left pb-1">
+                <div className="space-y-0.5 text-left pb-0.5">
                   <p className="text-xs text-muted-foreground font-normal">
                     {mode === "login"
                       ? "Enter your credentials to access your rentals."
@@ -70,16 +70,7 @@ export function AuthLayout({
                 </div>
 
                 {/* Form Children */}
-                <div className="space-y-3 pt-0.5">{children}</div>
-
-                {/* Security Footnote */}
-                <div className="pt-3 border-t border-border/60 dark:border-[#2D2D2D] flex items-center justify-between text-[11px] text-muted-foreground font-medium">
-                  <span className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                    256-Bit SSL Encrypted
-                  </span>
-                  <span>Instant Protection</span>
-                </div>
+                <div className="space-y-2.5 pt-0.5">{children}</div>
               </div>
             </div>
           </div>

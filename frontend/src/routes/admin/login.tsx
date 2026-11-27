@@ -31,8 +31,8 @@ function AdminLoginRedirect() {
   }, [navigate]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#070B14]">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+    <div className="min-h-screen flex items-center justify-center bg-[var(--admin-bg)]">
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--admin-border)] border-t-[var(--admin-text)]" />
     </div>
   );
 }

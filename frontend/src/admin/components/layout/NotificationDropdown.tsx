@@ -21,17 +21,10 @@ export function NotificationDropdown() {
   useEffect(() => {
     fetchNotifications();
 
-    // Set up auto-polling or listen to custom event if needed
     const handleRefresh = () => fetchNotifications();
-    window.addEventListener(
-      "payent:admin:refresh-notifications",
-      handleRefresh,
-    );
+    window.addEventListener("payent:admin:refresh-notifications", handleRefresh);
     return () =>
-      window.removeEventListener(
-        "payent:admin:refresh-notifications",
-        handleRefresh,
-      );
+      window.removeEventListener("payent:admin:refresh-notifications", handleRefresh);
   }, []);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -39,7 +32,6 @@ export function NotificationDropdown() {
   const handleMarkAllRead = async () => {
     try {
       await notificationsService.markAllRead();
-      // Instantly update state
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     } catch (err) {
       console.error(err);
@@ -61,81 +53,80 @@ export function NotificationDropdown() {
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+        className="relative h-9 w-9 flex items-center justify-center rounded-lg text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-elevated)] border border-transparent hover:border-[var(--admin-border)] transition-colors cursor-pointer"
+        aria-label="Notifications"
       >
-        <Bell className="h-4.5 w-4.5" />
+        <Bell className="h-4 w-4" strokeWidth={1.5} />
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-white ring-2 ring-background">
-            {unreadCount}
+          <span className="absolute -top-1 -right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-md bg-[var(--admin-error)] text-[11px] font-mono tabular-nums font-medium text-white">
+            {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
       </button>
 
       {isOpen && (
         <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setIsOpen(false)}
-          />
-          <div className="absolute right-0 mt-2.5 w-80 glass bg-card/95 rounded-2xl shadow-xl border border-border/80 z-50 overflow-hidden">
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          <div className="absolute right-0 mt-2 w-80 bg-[var(--admin-card)] rounded-xl shadow-lg border border-[var(--admin-border)] z-50 overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3.5 border-b border-border/50">
-              <span className="text-xs font-bold text-foreground">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--admin-border)]">
+              <span className="text-xs font-semibold text-[var(--admin-text)]">
                 Notifications
               </span>
               {unreadCount > 0 && (
                 <button
                   onClick={handleMarkAllRead}
-                  className="flex items-center gap-1 text-[10px] font-bold text-primary hover:underline"
+                  className="flex items-center gap-1 text-xs font-medium text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] cursor-pointer"
                 >
-                  <Check className="h-3 w-3" />
+                  <Check className="h-3.5 w-3.5" strokeWidth={1.5} />
                   <span>Mark all read</span>
                 </button>
               )}
             </div>
 
             {/* List */}
-            <div className="max-h-64 overflow-y-auto no-scrollbar divide-y divide-border/40">
+            <div className="max-h-64 overflow-y-auto no-scrollbar divide-y divide-[var(--admin-border)]">
               {notifications.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
-                  <Inbox className="h-8 w-8 opacity-40 mb-2" />
-                  <span className="text-xs font-semibold">All caught up!</span>
+                <div className="flex flex-col items-center justify-center py-8 text-center text-[var(--admin-text-muted)]">
+                  <Inbox className="h-6 w-6 opacity-50 mb-2" strokeWidth={1.5} />
+                  <span className="text-xs font-medium">No unread alerts</span>
                 </div>
               ) : (
                 notifications.slice(0, 5).map((n) => (
                   <div
                     key={n.id}
                     className={cn(
-                      "px-4 py-3 flex gap-3 hover:bg-secondary/40 transition-colors relative group/item",
-                      !n.read && "bg-primary/5",
+                      "px-4 py-3 flex gap-3 hover:bg-[var(--admin-elevated)]/50 transition-colors relative group/item",
+                      !n.read && "bg-[var(--admin-elevated)]/30"
                     )}
                   >
                     <div
                       className={cn(
                         "mt-1.5 h-2 w-2 shrink-0 rounded-full",
-                        n.type === "success" && "bg-green-500",
-                        n.type === "warning" && "bg-amber-500",
-                        n.type === "error" && "bg-red-500",
-                        n.type === "info" && "bg-blue-500",
+                        n.type === "success" && "bg-[var(--admin-success)]",
+                        n.type === "warning" && "bg-[var(--admin-warning)]",
+                        n.type === "error" && "bg-[var(--admin-error)]",
+                        n.type === "info" && "bg-[var(--admin-text-muted)]"
                       )}
                     />
-                    <div className="flex-1 min-w-0 pr-4">
-                      <p className="text-xs font-bold text-foreground truncate">
+                    <div className="flex-1 min-w-0 pr-5">
+                      <p className="text-xs font-medium text-[var(--admin-text)] truncate">
                         {n.title}
                       </p>
-                      <p className="text-[11px] font-medium text-muted-foreground leading-normal mt-0.5 line-clamp-2">
+                      <p className="text-xs text-[var(--admin-text-secondary)] leading-relaxed mt-0.5 line-clamp-2">
                         {n.message}
                       </p>
-                      <p className="text-[9px] font-semibold text-muted-foreground/60 mt-1">
+                      <p className="text-[11px] font-mono tabular-nums text-[var(--admin-text-muted)] mt-1">
                         {new Date(n.createdAt).toLocaleDateString()}
                       </p>
                     </div>
 
                     <button
                       onClick={(e) => handleDelete(e, n.id)}
-                      className="absolute right-3 top-3 opacity-0 group-hover/item:opacity-100 p-1 rounded-lg hover:bg-secondary text-muted-foreground hover:text-destructive transition-all"
+                      className="absolute right-3 top-3 opacity-0 group-hover/item:opacity-100 p-1 rounded hover:bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] hover:text-[var(--admin-error)] transition-opacity cursor-pointer"
+                      aria-label="Delete notification"
                     >
-                      <Trash className="h-3.5 w-3.5" />
+                      <Trash className="h-3.5 w-3.5" strokeWidth={1.5} />
                     </button>
                   </div>
                 ))
@@ -146,7 +137,7 @@ export function NotificationDropdown() {
             <Link
               to="/admin/notifications"
               onClick={() => setIsOpen(false)}
-              className="block text-center py-2.5 bg-secondary/35 text-[10px] font-bold text-muted-foreground hover:text-foreground border-t border-border/50 transition-colors"
+              className="block text-center py-2.5 bg-[var(--admin-elevated)]/40 text-xs font-medium text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] border-t border-[var(--admin-border)] transition-colors"
             >
               View all notifications
             </Link>

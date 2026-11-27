@@ -9,7 +9,7 @@ import {
   Filter,
   ArrowUpRight,
   ArrowDownRight,
-  Sparkles,
+  X,
   CheckCircle2,
   AlertCircle,
   Clock,
@@ -50,6 +50,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/hooks/useTheme";
 import {
   Tooltip as RadixTooltip,
   TooltipContent,
@@ -66,20 +67,34 @@ import {
 
 type TabType = "Overview" | "Bookings" | "Products" | "Users" | "Delivery" | "Finance";
 
-// CRITICAL: Preserve all original colour palette values exactly as implemented
-const PALETTE = {
-  accent: "#635BFF", // Primary Stripe-grade indigo
-  accentMuted: "rgba(99, 91, 255, 0.12)",
-  positive: "#16865C",
-  warning: "#D99118",
-  negative: "#DC4545",
-  gray: "#71717A",
-  prevLine: "#94A3B8",
-};
-
-const CATEGORY_COLORS = ["#635BFF", "#10B981", "#3B82F6", "#F59E0B", "#8B5CF6", "#EC4899"];
+function getStatusChartColor(status: string, isDark: boolean): string {
+  const key = status.toLowerCase();
+  if (key.includes("active")) return isDark ? "#4CC38A" : "#047857";
+  if (key.includes("confirm")) return isDark ? "#A1A1A6" : "#525252";
+  if (key.includes("complet")) return isDark ? "#52525B" : "#A1A1AA";
+  if (key.includes("pend")) return isDark ? "#F5B942" : "#D97706";
+  if (key.includes("cancel")) return isDark ? "#E5484D" : "#C93636";
+  return isDark ? "#85858B" : "#737373";
+}
 
 export default function Analytics() {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const accentHex = isDark ? "#4CC38A" : "#047857";
+  const prevLineHex = isDark ? "#71717A" : "#A1A1AA";
+  const mutedHex = isDark ? "#85858B" : "#737373";
+  const gridStroke = isDark ? "rgba(237,237,237,0.06)" : "rgba(23,23,23,0.06)";
+  const tooltipStyle = {
+    backgroundColor: isDark ? "#232325" : "#FFFFFF",
+    borderColor: isDark ? "rgba(237,237,237,0.12)" : "rgba(23,23,23,0.12)",
+    borderRadius: "8px",
+    fontSize: "12px",
+    color: isDark ? "#EDEDED" : "#171717",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+  };
+  const categoryColors = isDark
+    ? ["#4CC38A", "#A1A1A6", "#85858B", "#F5B942", "#52525B", "#71717A"]
+    : ["#047857", "#525252", "#737373", "#8A5A00", "#A1A1AA", "#D4D4D8"];
   // Preset default: Last 7 Days
   const [preset, setPreset] = useState<DateRangePreset>("7d");
   const [customStart, setCustomStart] = useState<string>("");
@@ -292,17 +307,17 @@ export default function Analytics() {
 
   if (loading && !dataset) {
     return (
-      <div className="space-y-4 max-w-[1520px] mx-auto pb-12 antialiased">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#E4E4E7] dark:border-[#27272A]">
+      <div className="space-y-4 max-w-[95rem] mx-auto pb-12 antialiased">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[var(--admin-border)]">
           <div className="space-y-1.5">
-            <div className="h-6 w-32 bg-[#E4E4E7] dark:bg-[#1E1E1E] rounded-md" />
-            <div className="h-3.5 w-64 bg-[#E4E4E7] dark:bg-[#1E1E1E] rounded" />
+            <div className="h-6 w-32 bg-[var(--admin-elevated)] rounded-md" />
+            <div className="h-3.5 w-64 bg-[var(--admin-elevated)] rounded" />
           </div>
-          <div className="h-9 w-80 bg-[#E4E4E7] dark:bg-[#1E1E1E] rounded-lg" />
+          <div className="h-9 w-80 bg-[var(--admin-elevated)] rounded-lg" />
         </div>
-        <div className="h-10 rounded-lg bg-[#E4E4E7] dark:bg-[#1E1E1E]" />
-        <div className="h-24 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A]" />
-        <div className="h-96 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A]" />
+        <div className="h-10 rounded-lg bg-[var(--admin-elevated)]" />
+        <div className="h-24 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)]" />
+        <div className="h-96 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)]" />
       </div>
     );
   }
@@ -311,19 +326,19 @@ export default function Analytics() {
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="space-y-5 max-w-[1520px] mx-auto pb-16 antialiased text-[#18181B] dark:text-[#F4F4F5]">
+      <div className="space-y-5 max-w-[95rem] mx-auto pb-16 antialiased text-[var(--admin-text)]">
         {/* =========================================================================
             SECTION A — COMPACT HEADER
             Aligned single row on desktop, wrapping cleanly on mobile.
             Title, short description, date-range, compare toggle, refresh, export.
            ========================================================================= */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3.5 border-b border-[#E4E4E7] dark:border-[#27272A]">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3.5 border-b border-[var(--admin-border)]">
           <div className="flex flex-col sm:flex-row sm:items-baseline gap-1.5 sm:gap-3">
-            <h1 className="text-xl font-bold tracking-tight text-[#18181B] dark:text-[#FAFAFA]">
+            <h1 className="text-xl font-bold tracking-tight text-[var(--admin-text)]">
               Analytics
             </h1>
-            <span className="hidden sm:inline text-xs text-[#71717A] dark:text-[#A1A1AA]">•</span>
-            <p className="text-xs text-[#71717A] dark:text-[#A1A1AA]">
+            <span className="hidden sm:inline text-xs text-[var(--admin-text-muted)]">•</span>
+            <p className="text-xs text-[var(--admin-text-muted)]">
               Understand bookings, rentals, and business performance.
             </p>
           </div>
@@ -331,7 +346,7 @@ export default function Analytics() {
           {/* Compact Aligned Controls */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Date-Range Selector */}
-            <div className="flex items-center rounded-lg bg-[#F4F4F5] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] p-0.5 text-xs font-medium">
+            <div className="flex items-center rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] p-1 text-xs font-medium">
               {(
                 [
                   { id: "today", label: "Today" },
@@ -344,10 +359,10 @@ export default function Analytics() {
                   key={opt.id}
                   onClick={() => setPreset(opt.id)}
                   className={cn(
-                    "px-2.5 py-1 rounded-md transition-all cursor-pointer text-xs",
+                    "px-2.5 py-1 rounded-md transition-colors cursor-pointer text-xs",
                     preset === opt.id
-                      ? "bg-white dark:bg-[#1E1E1E] text-[#18181B] dark:text-[#FAFAFA] font-semibold shadow-xs"
-                      : "text-[#71717A] dark:text-[#A1A1AA] hover:text-[#18181B] dark:hover:text-[#FAFAFA]"
+                      ? "bg-[var(--admin-card)] text-[var(--admin-text)] font-semibold shadow-xs"
+                      : "text-[var(--admin-text-muted)] hover:text-[var(--admin-text)]"
                   )}
                 >
                   {opt.label}
@@ -357,10 +372,10 @@ export default function Analytics() {
               <button
                 onClick={() => setShowCustomModal(true)}
                 className={cn(
-                  "px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1 text-xs",
+                  "px-2.5 py-1 rounded-md transition-colors cursor-pointer flex items-center gap-1 text-xs",
                   preset === "custom"
-                    ? "bg-white dark:bg-[#1E1E1E] text-[#18181B] dark:text-[#FAFAFA] font-semibold shadow-xs"
-                    : "text-[#71717A] dark:text-[#A1A1AA] hover:text-[#18181B] dark:hover:text-[#FAFAFA]"
+                    ? "bg-[var(--admin-card)] text-[var(--admin-text)] font-semibold shadow-xs"
+                    : "text-[var(--admin-text-muted)] hover:text-[var(--admin-text)]"
                 )}
               >
                 <Calendar className="h-3 w-3" />
@@ -374,12 +389,12 @@ export default function Analytics() {
               className={cn(
                 "px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer flex items-center gap-1.5",
                 comparePrevious
-                  ? "bg-white dark:bg-[#1E1E1E] text-[#18181B] dark:text-[#FAFAFA] border-[#E4E4E7] dark:border-[#27272A] shadow-xs"
-                  : "bg-transparent text-[#71717A] dark:text-[#A1A1AA] border-[#E4E4E7] dark:border-[#27272A] opacity-70"
+                  ? "bg-[var(--admin-card)] text-[var(--admin-text)] border-[var(--admin-border)] shadow-xs"
+                  : "bg-transparent text-[var(--admin-text-muted)] border-[var(--admin-border)] opacity-70"
               )}
               title="Compare metrics with previous equivalent period"
             >
-              <Activity className={cn("h-3 w-3", comparePrevious ? "text-[#635BFF]" : "text-[#71717A]")} />
+              <Activity className={cn("h-3 w-3", comparePrevious ? "text-[var(--admin-success)]" : "text-[var(--admin-text-muted)]")} />
               <span className="hidden sm:inline">Compare</span>
             </button>
 
@@ -387,43 +402,43 @@ export default function Analytics() {
             <button
               onClick={() => loadData(true)}
               disabled={refreshing}
-              className="p-1.5 rounded-lg bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] text-[#71717A] hover:text-[#18181B] dark:hover:text-[#FAFAFA] shadow-xs transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg bg-[var(--admin-card)] border border-[var(--admin-border)] text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] shadow-xs transition-colors cursor-pointer"
               title="Refresh real-time telemetry"
             >
-              <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin text-[#635BFF]")} />
+              <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin text-[var(--admin-success)]")} />
             </button>
 
             {/* Export Menu */}
             <div className="relative">
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
-                className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] text-[#18181B] dark:text-[#FAFAFA] text-xs font-medium shadow-xs hover:bg-[#F4F4F5] dark:hover:bg-[#1A1F2C] transition-colors cursor-pointer flex items-center gap-1.5"
+                className="px-2.5 py-1.5 rounded-lg bg-[var(--admin-card)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs font-medium shadow-xs hover:bg-[var(--admin-elevated)] transition-colors cursor-pointer flex items-center gap-1.5"
               >
-                <Download className="h-3.5 w-3.5 text-[#635BFF]" />
+                <Download className="h-3.5 w-3.5 text-[var(--admin-success)]" />
                 <span>Export</span>
               </button>
 
               {showExportMenu && (
-                <div className="absolute right-0 mt-1.5 w-52 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-lg p-1.5 z-50 text-xs">
+                <div className="absolute right-0 mt-1.5 w-52 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-lg p-1.5 z-50 text-xs">
                   <button
                     onClick={handleExportBookings}
-                    className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-[#F4F4F5] dark:hover:bg-[#1A1F2C] text-[#18181B] dark:text-[#FAFAFA] flex items-center gap-2 cursor-pointer"
+                    className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] flex items-center gap-2 cursor-pointer"
                   >
-                    <FileSpreadsheet className="h-3.5 w-3.5 text-[#16865C]" />
+                    <FileSpreadsheet className="h-3.5 w-3.5 text-[var(--admin-success)]" />
                     <span>Bookings Ledger (CSV)</span>
                   </button>
                   <button
                     onClick={handleExportReconciliation}
-                    className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-[#F4F4F5] dark:hover:bg-[#1A1F2C] text-[#18181B] dark:text-[#FAFAFA] flex items-center gap-2 cursor-pointer"
+                    className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] flex items-center gap-2 cursor-pointer"
                   >
-                    <CreditCard className="h-3.5 w-3.5 text-[#635BFF]" />
+                    <CreditCard className="h-3.5 w-3.5 text-[var(--admin-success)]" />
                     <span>Reconciliation Report (CSV)</span>
                   </button>
                   <button
                     onClick={handleExportFleetUtilization}
-                    className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-[#F4F4F5] dark:hover:bg-[#1A1F2C] text-[#18181B] dark:text-[#FAFAFA] flex items-center gap-2 cursor-pointer"
+                    className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] flex items-center gap-2 cursor-pointer"
                   >
-                    <Package className="h-3.5 w-3.5 text-[#D99118]" />
+                    <Package className="h-3.5 w-3.5 text-[var(--admin-warning)]" />
                     <span>Fleet Utilization (CSV)</span>
                   </button>
                 </div>
@@ -435,52 +450,54 @@ export default function Analytics() {
         {/* Custom Date Range Modal */}
         <AnimatePresence>
           {showCustomModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
               <motion.div
-                initial={{ opacity: 0, scale: 0.96 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.96 }}
-                className="w-full max-w-sm rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] p-5 shadow-xl space-y-4 text-xs"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 6 }}
+                transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+                className="w-full max-w-sm rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] p-5 shadow-xl space-y-4 text-xs"
               >
-                <div className="flex items-center justify-between pb-2 border-b border-[#E4E4E7] dark:border-[#27272A]">
-                  <h3 className="font-semibold text-sm text-[#18181B] dark:text-[#FAFAFA]">
+                <div className="flex items-center justify-between pb-2 border-b border-[var(--admin-border)]">
+                  <h3 className="font-semibold text-sm text-[var(--admin-text)]">
                     Select Date Range
                   </h3>
                   <button
                     onClick={() => setShowCustomModal(false)}
-                    className="text-[#71717A] hover:text-[#18181B] dark:hover:text-[#FAFAFA] cursor-pointer"
+                    aria-label="Close date range dialog"
+                    className="p-1 rounded-md text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-elevated)] transition-colors cursor-pointer"
                   >
-                    ✕
+                    <X className="h-4 w-4" />
                   </button>
                 </div>
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-[11px] font-medium text-[#71717A] dark:text-[#A1A1AA] mb-1">
+                    <label className="block text-[11px] font-medium text-[var(--admin-text-muted)] mb-1">
                       Start Date
                     </label>
                     <input
                       type="date"
                       value={customStart}
                       onChange={(e) => setCustomStart(e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-lg bg-[#F4F4F5] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] text-[#18181B] dark:text-[#FAFAFA]"
+                      className="w-full px-3 py-1.5 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)]"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-[#71717A] dark:text-[#A1A1AA] mb-1">
+                    <label className="block text-[11px] font-medium text-[var(--admin-text-muted)] mb-1">
                       End Date
                     </label>
                     <input
                       type="date"
                       value={customEnd}
                       onChange={(e) => setCustomEnd(e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-lg bg-[#F4F4F5] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] text-[#18181B] dark:text-[#FAFAFA]"
+                      className="w-full px-3 py-1.5 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)]"
                     />
                   </div>
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
                   <button
                     onClick={() => setShowCustomModal(false)}
-                    className="px-3 py-1.5 rounded-lg border border-[#E4E4E7] dark:border-[#27272A] font-medium text-[#71717A] cursor-pointer"
+                    className="px-3 py-1.5 rounded-lg border border-[var(--admin-border)] font-medium text-[var(--admin-text-muted)] cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -497,7 +514,7 @@ export default function Analytics() {
                       setPreset("custom");
                       setShowCustomModal(false);
                     }}
-                    className="px-3.5 py-1.5 rounded-lg bg-[#635BFF] text-white font-medium cursor-pointer shadow-xs"
+                    className="px-3.5 py-1.5 rounded-lg bg-[var(--admin-accent)] text-[var(--admin-bg)] font-medium hover:bg-[var(--admin-accent-hover)] transition-colors cursor-pointer"
                   >
                     Apply Range
                   </button>
@@ -512,7 +529,7 @@ export default function Analytics() {
             Horizontal navigation bar placed DIRECTLY below the header.
             Tabs: Overview, Bookings, Products & Utilization, Users, Delivery, Finance.
            ========================================================================= */}
-        <div className="flex items-center justify-between border-b border-[#E4E4E7] dark:border-[#27272A] pb-2.5">
+        <div className="flex items-center justify-between border-b border-[var(--admin-border)] pb-2.5">
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
             {(
               [
@@ -528,10 +545,10 @@ export default function Analytics() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as TabType)}
                 className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap",
+                  "px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap",
                   activeTab === tab.id
-                    ? "bg-[#18181B] text-white dark:bg-[#FAFAFA] dark:text-[#18181B] shadow-xs"
-                    : "text-[#71717A] dark:text-[#A1A1AA] hover:text-[#18181B] dark:hover:text-[#FAFAFA] hover:bg-[#F4F4F5] dark:hover:bg-[#1A1F2C]"
+                    ? "bg-[var(--admin-accent)] text-[var(--admin-bg)] shadow-xs"
+                    : "text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-elevated)]"
                 )}
               >
                 {tab.label}
@@ -539,8 +556,8 @@ export default function Analytics() {
             ))}
           </div>
 
-          <div className="flex items-center gap-2 text-[11px] font-mono text-[#71717A] dark:text-[#A1A1AA] hidden sm:flex">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#16865C]" />
+          <div className="hidden sm:flex items-center gap-2 text-[11px] font-mono text-[var(--admin-text-muted)]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[var(--admin-success)]" />
             <span>Range: {dataset?.range.label}</span>
           </div>
         </div>
@@ -554,22 +571,22 @@ export default function Analytics() {
            ========================================================================= */}
         {kpis && (
           <div className="space-y-2">
-            <div className="rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs overflow-hidden">
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-y md:divide-y-0 md:divide-x divide-[#E4E4E7] dark:divide-[#27272A]">
+            <div className="rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs overflow-hidden">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-y md:divide-y-0 md:divide-x divide-[var(--admin-border)]">
                 {/* 1. Total Bookings */}
                 <div className="p-3.5 sm:p-4 flex flex-col justify-between">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-medium text-[#71717A] dark:text-[#A1A1AA]">
+                    <span className="text-[11px] font-medium text-[var(--admin-text-muted)]">
                       Total Bookings
                     </span>
                     <RadixTooltip>
                       <TooltipTrigger asChild>
-                        <Info className="h-3 w-3 text-[#71717A] cursor-help" />
+                        <Info className="h-3 w-3 text-[var(--admin-text-muted)] cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent side="top">Customer reservation orders initiated</TooltipContent>
                     </RadixTooltip>
                   </div>
-                  <div className="text-2xl font-bold font-mono tracking-tight text-[#18181B] dark:text-[#FAFAFA] mt-1">
+                  <div className="text-2xl font-bold font-mono tracking-tight text-[var(--admin-text)] mt-1">
                     {kpis.totalBookings.current.toLocaleString()}
                   </div>
                   {comparePrevious ? (
@@ -578,10 +595,10 @@ export default function Analytics() {
                         className={cn(
                           "font-mono font-semibold flex items-center",
                           kpis.totalBookings.trend === "up"
-                            ? "text-[#16865C]"
+                            ? "text-[var(--admin-success)]"
                             : kpis.totalBookings.trend === "down"
-                            ? "text-[#DC4545]"
-                            : "text-[#71717A]"
+                            ? "text-[var(--admin-error)]"
+                            : "text-[var(--admin-text-muted)]"
                         )}
                       >
                         {kpis.totalBookings.trend === "up" && <ArrowUpRight className="h-3 w-3 inline" />}
@@ -590,27 +607,27 @@ export default function Analytics() {
                           ? `${kpis.totalBookings.percentageChange > 0 ? "+" : ""}${kpis.totalBookings.percentageChange}%`
                           : "0%"}
                       </span>
-                      <span className="text-[10px] text-[#71717A] dark:text-[#A1A1AA]">vs prior</span>
+                      <span className="text-[11px] text-[var(--admin-text-muted)]">vs prior</span>
                     </div>
                   ) : (
-                    <span className="text-[10px] text-[#71717A] dark:text-[#A1A1AA] mt-1">Orders</span>
+                    <span className="text-[11px] text-[var(--admin-text-muted)] mt-1">Orders</span>
                   )}
                 </div>
 
                 {/* 2. Completed Rentals */}
                 <div className="p-3.5 sm:p-4 flex flex-col justify-between">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-medium text-[#71717A] dark:text-[#A1A1AA]">
+                    <span className="text-[11px] font-medium text-[var(--admin-text-muted)]">
                       Completed Rentals
                     </span>
                     <RadixTooltip>
                       <TooltipTrigger asChild>
-                        <Info className="h-3 w-3 text-[#71717A] cursor-help" />
+                        <Info className="h-3 w-3 text-[var(--admin-text-muted)] cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent side="top">Fulfillments safely returned and closed</TooltipContent>
                     </RadixTooltip>
                   </div>
-                  <div className="text-2xl font-bold font-mono tracking-tight text-[#18181B] dark:text-[#FAFAFA] mt-1">
+                  <div className="text-2xl font-bold font-mono tracking-tight text-[var(--admin-text)] mt-1">
                     {kpis.completedRentals.current.toLocaleString()}
                   </div>
                   {comparePrevious ? (
@@ -618,34 +635,34 @@ export default function Analytics() {
                       <span
                         className={cn(
                           "font-mono font-semibold flex items-center",
-                          kpis.completedRentals.trend === "up" ? "text-[#16865C]" : "text-[#71717A]"
+                          kpis.completedRentals.trend === "up" ? "text-[var(--admin-success)]" : "text-[var(--admin-text-muted)]"
                         )}
                       >
                         {kpis.completedRentals.percentageChange !== null
                           ? `${kpis.completedRentals.percentageChange > 0 ? "+" : ""}${kpis.completedRentals.percentageChange}%`
                           : "0%"}
                       </span>
-                      <span className="text-[10px] text-[#71717A] dark:text-[#A1A1AA]">vs prior</span>
+                      <span className="text-[11px] text-[var(--admin-text-muted)]">vs prior</span>
                     </div>
                   ) : (
-                    <span className="text-[10px] text-[#71717A] dark:text-[#A1A1AA] mt-1">Completed</span>
+                    <span className="text-[11px] text-[var(--admin-text-muted)] mt-1">Completed</span>
                   )}
                 </div>
 
                 {/* 3. Confirmed Bookings */}
                 <div className="p-3.5 sm:p-4 flex flex-col justify-between">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-medium text-[#71717A] dark:text-[#A1A1AA]">
+                    <span className="text-[11px] font-medium text-[var(--admin-text-muted)]">
                       Confirmed Bookings
                     </span>
                     <RadixTooltip>
                       <TooltipTrigger asChild>
-                        <Info className="h-3 w-3 text-[#71717A] cursor-help" />
+                        <Info className="h-3 w-3 text-[var(--admin-text-muted)] cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent side="top">Lender accepted & active reservations</TooltipContent>
                     </RadixTooltip>
                   </div>
-                  <div className="text-2xl font-bold font-mono tracking-tight text-[#18181B] dark:text-[#FAFAFA] mt-1">
+                  <div className="text-2xl font-bold font-mono tracking-tight text-[var(--admin-text)] mt-1">
                     {kpis.confirmedBookings.current.toLocaleString()}
                   </div>
                   {comparePrevious ? (
@@ -653,58 +670,58 @@ export default function Analytics() {
                       <span
                         className={cn(
                           "font-mono font-semibold flex items-center",
-                          kpis.confirmedBookings.trend === "up" ? "text-[#16865C]" : "text-[#71717A]"
+                          kpis.confirmedBookings.trend === "up" ? "text-[var(--admin-success)]" : "text-[var(--admin-text-muted)]"
                         )}
                       >
                         {kpis.confirmedBookings.percentageChange !== null
                           ? `${kpis.confirmedBookings.percentageChange > 0 ? "+" : ""}${kpis.confirmedBookings.percentageChange}%`
                           : "0%"}
                       </span>
-                      <span className="text-[10px] text-[#71717A] dark:text-[#A1A1AA]">vs prior</span>
+                      <span className="text-[11px] text-[var(--admin-text-muted)]">vs prior</span>
                     </div>
                   ) : (
-                    <span className="text-[10px] text-[#71717A] dark:text-[#A1A1AA] mt-1">Confirmed</span>
+                    <span className="text-[11px] text-[var(--admin-text-muted)] mt-1">Confirmed</span>
                   )}
                 </div>
 
                 {/* 4. Cancelled Bookings */}
                 <div className="p-3.5 sm:p-4 flex flex-col justify-between">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-medium text-[#71717A] dark:text-[#A1A1AA]">
+                    <span className="text-[11px] font-medium text-[var(--admin-text-muted)]">
                       Cancelled Bookings
                     </span>
                     <RadixTooltip>
                       <TooltipTrigger asChild>
-                        <Info className="h-3 w-3 text-[#71717A] cursor-help" />
+                        <Info className="h-3 w-3 text-[var(--admin-text-muted)] cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent side="top">Terminated or refunded bookings</TooltipContent>
                     </RadixTooltip>
                   </div>
-                  <div className="text-2xl font-bold font-mono tracking-tight text-[#DC4545] mt-1">
+                  <div className="text-2xl font-bold font-mono tracking-tight text-[var(--admin-error)] mt-1">
                     {kpis.cancelledBookings.current.toLocaleString()}
                   </div>
-                  <div className="flex items-center gap-1 text-[11px] mt-1 text-[#71717A] dark:text-[#A1A1AA]">
-                    <span className="font-mono text-[#DC4545] font-semibold text-[10px]">
+                  <div className="flex items-center gap-1 text-[11px] mt-1 text-[var(--admin-text-muted)]">
+                    <span className="font-mono text-[var(--admin-error)] font-semibold text-[11px]">
                       {kpis.cancellationRate.current}%
                     </span>
-                    <span className="text-[10px]">cancel rate</span>
+                    <span className="text-[11px]">cancel rate</span>
                   </div>
                 </div>
 
                 {/* 5. Gross Rental Value */}
                 <div className="p-3.5 sm:p-4 flex flex-col justify-between">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-medium text-[#71717A] dark:text-[#A1A1AA]">
+                    <span className="text-[11px] font-medium text-[var(--admin-text-muted)]">
                       Gross Rental Value
                     </span>
                     <RadixTooltip>
                       <TooltipTrigger asChild>
-                        <Info className="h-3 w-3 text-[#71717A] cursor-help" />
+                        <Info className="h-3 w-3 text-[var(--admin-text-muted)] cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent side="top">Total gross rental turnover</TooltipContent>
                     </RadixTooltip>
                   </div>
-                  <div className="text-2xl font-bold font-mono tracking-tight text-[#18181B] dark:text-[#FAFAFA] mt-1">
+                  <div className="text-2xl font-bold font-mono tracking-tight text-[var(--admin-text)] mt-1">
                     ₹{kpis.grossRentalValue.current.toLocaleString("en-IN")}
                   </div>
                   {comparePrevious ? (
@@ -712,69 +729,69 @@ export default function Analytics() {
                       <span
                         className={cn(
                           "font-mono font-semibold flex items-center",
-                          kpis.grossRentalValue.trend === "up" ? "text-[#16865C]" : "text-[#71717A]"
+                          kpis.grossRentalValue.trend === "up" ? "text-[var(--admin-success)]" : "text-[var(--admin-text-muted)]"
                         )}
                       >
                         {kpis.grossRentalValue.percentageChange !== null
                           ? `${kpis.grossRentalValue.percentageChange > 0 ? "+" : ""}${kpis.grossRentalValue.percentageChange}%`
                           : "0%"}
                       </span>
-                      <span className="text-[10px] text-[#71717A] dark:text-[#A1A1AA]">vs prior</span>
+                      <span className="text-[11px] text-[var(--admin-text-muted)]">vs prior</span>
                     </div>
                   ) : (
-                    <span className="text-[10px] text-[#71717A] dark:text-[#A1A1AA] mt-1">Turnover</span>
+                    <span className="text-[11px] text-[var(--admin-text-muted)] mt-1">Turnover</span>
                   )}
                 </div>
 
                 {/* 6. Platform Revenue (10% Take-rate) */}
-                <div className="p-3.5 sm:p-4 flex flex-col justify-between bg-[#FAFAFB] dark:bg-[#1E1E1E]">
+                <div className="p-3.5 sm:p-4 flex flex-col justify-between bg-[var(--admin-elevated)]">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold text-[#635BFF]">
+                    <span className="text-[11px] font-semibold text-[var(--admin-success)]">
                       Platform Revenue
                     </span>
                     <RadixTooltip>
                       <TooltipTrigger asChild>
-                        <Info className="h-3 w-3 text-[#635BFF] cursor-help" />
+                        <Info className="h-3 w-3 text-[var(--admin-success)] cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent side="top">10% Platform fee on realized transactions</TooltipContent>
                     </RadixTooltip>
                   </div>
-                  <div className="text-2xl font-bold font-mono tracking-tight text-[#635BFF] mt-1">
+                  <div className="text-2xl font-bold font-mono tracking-tight text-[var(--admin-success)] mt-1">
                     ₹{kpis.platformRevenue.current.toLocaleString("en-IN")}
                   </div>
-                  <div className="flex items-center gap-1 text-[11px] mt-1 text-[#71717A] dark:text-[#A1A1AA]">
-                    <span className="font-mono text-[#16865C] font-semibold text-[10px]">10% fee</span>
-                    <span className="text-[10px]">take-rate</span>
+                  <div className="flex items-center gap-1 text-[11px] mt-1 text-[var(--admin-text-muted)]">
+                    <span className="font-mono text-[var(--admin-success)] font-semibold text-[11px]">10% fee</span>
+                    <span className="text-[11px]">take-rate</span>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Contextual Operational Summary Strip */}
-            <div className="flex flex-wrap items-center justify-between px-3.5 py-2 rounded-lg bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] text-xs text-[#71717A] dark:text-[#A1A1AA]">
+            <div className="flex flex-wrap items-center justify-between px-3.5 py-2 rounded-lg bg-[var(--admin-card)] border border-[var(--admin-border)] text-xs text-[var(--admin-text-muted)]">
               <div className="flex items-center gap-5">
                 <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  <span className="h-2 w-2 rounded-full bg-[var(--admin-success)]" />
                   <span>
-                    <strong className="text-[#18181B] dark:text-[#FAFAFA] font-mono">
+                    <strong className="text-[var(--admin-text)] font-mono">
                       {kpis.activeRentals.current}
                     </strong>{" "}
                     Active Rentals in circulation
                   </span>
                 </div>
                 <div className="hidden sm:flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-[#635BFF]" />
+                  <span className="h-2 w-2 rounded-full bg-[var(--admin-success)]" />
                   <span>
-                    <strong className="text-[#18181B] dark:text-[#FAFAFA] font-mono">
+                    <strong className="text-[var(--admin-text)] font-mono">
                       {kpis.rentalUtilizationRate.current}%
                     </strong>{" "}
                     Fleet Utilization Rate
                   </span>
                 </div>
                 <div className="hidden md:flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-amber-500" />
+                  <span className="h-2 w-2 rounded-full bg-[var(--admin-warning)]" />
                   <span>
-                    <strong className="text-[#18181B] dark:text-[#FAFAFA] font-mono">
+                    <strong className="text-[var(--admin-text)] font-mono">
                       {kpis.openIssues.current}
                     </strong>{" "}
                     Open Operational Issues
@@ -782,7 +799,7 @@ export default function Analytics() {
                 </div>
               </div>
 
-              <div className="text-[11px] font-mono text-[#71717A] hidden lg:block">
+              <div className="text-[11px] font-mono text-[var(--admin-text-muted)] hidden lg:block">
                 Datastore: MySQL Live / Verified Ingest
               </div>
             </div>
@@ -802,24 +819,24 @@ export default function Analytics() {
                -------------------------------------------------------------------- */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
               {/* Left Column (8 cols ~ 67%): Main Booking Trend Visual Focus */}
-              <div className="lg:col-span-8 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-8 p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs flex flex-col justify-between">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                   <div>
-                    <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
+                    <h3 className="text-xs font-bold text-[var(--admin-text)]">
                       Booking Velocity Trend
                     </h3>
-                    <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
+                    <p className="text-[11px] text-[var(--admin-text-muted)]">
                       Daily reservation volume across selected interval
                     </p>
                   </div>
                   <div className="flex items-center gap-3 text-xs">
-                    <span className="flex items-center gap-1.5 text-[11px] text-[#18181B] dark:text-[#FAFAFA]">
-                      <span className="h-2 w-2 rounded-full bg-[#635BFF]" />
+                    <span className="flex items-center gap-1.5 text-[11px] text-[var(--admin-text)]">
+                      <span className="h-2 w-2 rounded-full bg-[var(--admin-success)]" />
                       Current Period
                     </span>
                     {comparePrevious && (
-                      <span className="flex items-center gap-1.5 text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
-                        <span className="h-2 w-2 rounded-full bg-[#94A3B8]" />
+                      <span className="flex items-center gap-1.5 text-[11px] text-[var(--admin-text-muted)]">
+                        <span className="h-2 w-2 rounded-full bg-[var(--admin-text-muted)]" />
                         Previous Window
                       </span>
                     )}
@@ -830,26 +847,19 @@ export default function Analytics() {
                   {dataset?.bookingTrend && dataset.bookingTrend.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={dataset.bookingTrend}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
-                        <XAxis dataKey="label" stroke="#71717A" fontSize={10} tickLine={false} />
-                        <YAxis stroke="#71717A" fontSize={10} tickLine={false} allowDecimals={false} />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
+                        <XAxis dataKey="label" stroke={mutedHex} fontSize={11} tickLine={false} />
+                        <YAxis stroke={mutedHex} fontSize={11} tickLine={false} allowDecimals={false} />
                         <Tooltip
-                          contentStyle={{
-                            backgroundColor: "#18181B",
-                            borderColor: "#27272A",
-                            borderRadius: "8px",
-                            fontSize: "11px",
-                            color: "#FFFFFF",
-                            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                          }}
+                          contentStyle={tooltipStyle}
                         />
                         <Line
                           type="monotone"
                           dataKey="currentBookings"
                           name="Current Period"
-                          stroke="#635BFF"
+                          stroke={accentHex}
                           strokeWidth={2.4}
-                          dot={{ r: 2.5, fill: "#635BFF" }}
+                          dot={{ r: 2.5, fill: accentHex }}
                           activeDot={{ r: 5 }}
                         />
                         {comparePrevious && (
@@ -857,7 +867,7 @@ export default function Analytics() {
                             type="monotone"
                             dataKey="previousBookings"
                             name="Previous Window"
-                            stroke="#94A3B8"
+                            stroke={prevLineHex}
                             strokeWidth={1.5}
                             strokeDasharray="4 4"
                             dot={false}
@@ -866,7 +876,7 @@ export default function Analytics() {
                       </LineChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="h-full flex items-center justify-center text-xs text-[#71717A]">
+                    <div className="h-full flex items-center justify-center text-xs text-[var(--admin-text-muted)]">
                       No activity in this date range.
                     </div>
                   )}
@@ -874,12 +884,12 @@ export default function Analytics() {
               </div>
 
               {/* Right Column (4 cols ~ 33%): Performance Summary & Status Distribution */}
-              <div className="lg:col-span-4 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-4 p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs flex flex-col justify-between">
                 <div>
-                  <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
+                  <h3 className="text-xs font-bold text-[var(--admin-text)]">
                     Performance & Status Summary
                   </h3>
-                  <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
+                  <p className="text-[11px] text-[var(--admin-text-muted)]">
                     Order fulfillment distribution
                   </p>
                 </div>
@@ -898,17 +908,11 @@ export default function Analytics() {
                           dataKey="count"
                         >
                           {dataset?.statusDistribution.map((entry) => (
-                            <Cell key={entry.status} fill={entry.color} />
+                            <Cell key={entry.status} fill={getStatusChartColor(entry.status || entry.label, isDark)} />
                           ))}
                         </Pie>
                         <Tooltip
-                          contentStyle={{
-                            backgroundColor: "#18181B",
-                            borderColor: "#27272A",
-                            borderRadius: "8px",
-                            fontSize: "11px",
-                            color: "#FFFFFF",
-                          }}
+                          contentStyle={tooltipStyle}
                         />
                       </PieChart>
                     </ResponsiveContainer>
@@ -916,7 +920,7 @@ export default function Analytics() {
                       <span className="text-xl font-bold font-mono leading-none">
                         {kpis?.totalBookings.current}
                       </span>
-                      <span className="text-[9px] text-[#71717A] uppercase font-semibold">Orders</span>
+                      <span className="text-[11px] text-[var(--admin-text-muted)] font-medium">Orders</span>
                     </div>
                   </div>
 
@@ -925,10 +929,10 @@ export default function Analytics() {
                     {dataset?.statusDistribution.map((st) => (
                       <div key={st.status} className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: st.color }} />
-                          <span className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">{st.label}</span>
+                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: getStatusChartColor(st.status || st.label, isDark) }} />
+                          <span className="text-[11px] text-[var(--admin-text-muted)]">{st.label}</span>
                         </div>
-                        <span className="font-mono text-[11px] font-semibold text-[#18181B] dark:text-[#FAFAFA]">
+                        <span className="font-mono text-[11px] font-semibold text-[var(--admin-text)]">
                           {st.count}
                         </span>
                       </div>
@@ -936,19 +940,19 @@ export default function Analytics() {
                   </div>
 
                   {/* Fulfillment Performance Progress Mini-Bars */}
-                  <div className="w-full pt-3 mt-3 border-t border-[#E4E4E7] dark:border-[#27272A] space-y-2">
+                  <div className="w-full pt-3 mt-3 border-t border-[var(--admin-border)] space-y-2">
                     <div className="space-y-1">
                       <div className="flex justify-between text-[11px]">
-                        <span className="text-[#71717A]">Fulfillment Rate</span>
-                        <span className="font-mono font-semibold text-[#16865C]">
+                        <span className="text-[var(--admin-text-muted)]">Fulfillment Rate</span>
+                        <span className="font-mono font-semibold text-[var(--admin-success)]">
                           {kpis && kpis.totalBookings.current > 0
                             ? Math.round((kpis.completedRentals.current / kpis.totalBookings.current) * 100)
                             : 0}%
                         </span>
                       </div>
-                      <div className="h-1.5 w-full bg-[#F4F4F5] dark:bg-[#1E1E1E] rounded-full overflow-hidden">
+                      <div className="h-1.5 w-full bg-[var(--admin-elevated)] rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-[#16865C] rounded-full"
+                          className="h-full bg-[var(--admin-success)] rounded-full"
                           style={{
                             width: `${Math.min(100, kpis && kpis.totalBookings.current > 0 ? (kpis.completedRentals.current / kpis.totalBookings.current) * 100 : 0)}%`,
                           }}
@@ -966,15 +970,15 @@ export default function Analytics() {
                 Short list of meaningful data-backed insights with supporting metrics.
                -------------------------------------------------------------------- */}
             {dataset?.insights && dataset.insights.length > 0 && (
-              <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3">
+              <div className="p-4 sm:p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="h-3.5 w-3.5 text-[#635BFF]" />
-                    <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
+                    <BarChart2 className="h-3.5 w-3.5 text-[var(--admin-success)]" />
+                    <h3 className="text-xs font-bold text-[var(--admin-text)]">
                       Business Intelligence Insights
                     </h3>
                   </div>
-                  <span className="text-[10px] font-mono text-[#71717A]">
+                  <span className="text-[11px] font-mono text-[var(--admin-text-muted)]">
                     Verified calculations for {dataset.range.label}
                   </span>
                 </div>
@@ -992,22 +996,22 @@ export default function Analytics() {
                             : (ins.tabTarget as TabType)
                         )
                       }
-                      className="p-3.5 rounded-lg bg-[#F7F7F8] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] hover:border-[#635BFF]/40 transition-colors cursor-pointer flex flex-col justify-between"
+                      className="p-3.5 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] hover:border-[var(--admin-success)]/40 transition-colors cursor-pointer flex flex-col justify-between"
                     >
                       <div className="space-y-1">
                         <div className="flex items-center justify-between">
-                          <span className="font-semibold text-xs text-[#18181B] dark:text-[#FAFAFA]">
+                          <span className="font-semibold text-xs text-[var(--admin-text)]">
                             {ins.title}
                           </span>
-                          <span className="text-[10px] font-mono font-bold text-[#635BFF]">
+                          <span className="text-[11px] font-mono font-bold text-[var(--admin-success)]">
                             {ins.metric}
                           </span>
                         </div>
-                        <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA] leading-relaxed">
+                        <p className="text-[11px] text-[var(--admin-text-muted)] leading-relaxed">
                           {ins.description}
                         </p>
                       </div>
-                      <span className="text-[10px] font-medium text-[#635BFF] flex items-center gap-1 mt-2.5">
+                      <span className="text-[11px] font-medium text-[var(--admin-success)] flex items-center gap-1 mt-2.5">
                         Inspect in {ins.tabTarget} <ArrowUpRight className="h-2.5 w-2.5" />
                       </span>
                     </div>
@@ -1025,12 +1029,12 @@ export default function Analytics() {
                -------------------------------------------------------------------- */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               {/* Left: Category Booking Performance */}
-              <div className="p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs flex flex-col justify-between">
                 <div className="mb-4">
-                  <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
+                  <h3 className="text-xs font-bold text-[var(--admin-text)]">
                     Category Booking Performance
                   </h3>
-                  <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
+                  <p className="text-[11px] text-[var(--admin-text-muted)]">
                     Booking demand across gear categories
                   </p>
                 </div>
@@ -1039,23 +1043,17 @@ export default function Analytics() {
                   {dataset?.categoryBreakdown && dataset.categoryBreakdown.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={dataset.categoryBreakdown} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border)" opacity={0.5} />
-                        <XAxis type="number" stroke="#71717A" fontSize={10} tickLine={false} allowDecimals={false} />
-                        <YAxis dataKey="name" type="category" stroke="#71717A" fontSize={11} tickLine={false} width={105} />
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={gridStroke} />
+                        <XAxis type="number" stroke={mutedHex} fontSize={11} tickLine={false} allowDecimals={false} />
+                        <YAxis dataKey="name" type="category" stroke={mutedHex} fontSize={11} tickLine={false} width={105} />
                         <Tooltip
-                          contentStyle={{
-                            backgroundColor: "#18181B",
-                            borderColor: "#27272A",
-                            borderRadius: "8px",
-                            fontSize: "11px",
-                            color: "#FFFFFF",
-                          }}
+                          contentStyle={tooltipStyle}
                         />
-                        <Bar dataKey="bookings" fill="#635BFF" radius={[0, 4, 4, 0]} barSize={16} />
+                        <Bar dataKey="bookings" fill={accentHex} radius={[0, 4, 4, 0]} barSize={16} />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="h-full flex items-center justify-center text-xs text-[#71717A]">
+                    <div className="h-full flex items-center justify-center text-xs text-[var(--admin-text-muted)]">
                       No category metrics available.
                     </div>
                   )}
@@ -1063,12 +1061,12 @@ export default function Analytics() {
               </div>
 
               {/* Right: Rental Performance Area Chart */}
-              <div className="p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs flex flex-col justify-between">
                 <div className="mb-4">
-                  <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
+                  <h3 className="text-xs font-bold text-[var(--admin-text)]">
                     Rental Turnover Progression
                   </h3>
-                  <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
+                  <p className="text-[11px] text-[var(--admin-text-muted)]">
                     Realized transaction revenue over time
                   </p>
                 </div>
@@ -1079,39 +1077,33 @@ export default function Analytics() {
                       <AreaChart data={dataset.bookingTrend}>
                         <defs>
                           <linearGradient id="editorialRevGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#635BFF" stopOpacity={0.16} />
-                            <stop offset="100%" stopColor="#635BFF" stopOpacity={0.0} />
+                            <stop offset="0%" stopColor={accentHex} stopOpacity={0.16} />
+                            <stop offset="100%" stopColor={accentHex} stopOpacity={0.0} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
-                        <XAxis dataKey="label" stroke="#71717A" fontSize={10} tickLine={false} />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
+                        <XAxis dataKey="label" stroke={mutedHex} fontSize={11} tickLine={false} />
                         <YAxis
-                          stroke="#71717A"
-                          fontSize={10}
+                          stroke={mutedHex}
+                          fontSize={11}
                           tickLine={false}
                           tickFormatter={(v) => `₹${v >= 1000 ? `${v / 1000}k` : v}`}
                         />
                         <Tooltip
-                          contentStyle={{
-                            backgroundColor: "#18181B",
-                            borderColor: "#27272A",
-                            borderRadius: "8px",
-                            fontSize: "11px",
-                            color: "#FFFFFF",
-                          }}
+                          contentStyle={tooltipStyle}
                           formatter={(v: number) => [`₹${v.toLocaleString("en-IN")}`, "Turnover"]}
                         />
                         <Area
                           type="monotone"
                           dataKey="currentRevenue"
-                          stroke="#635BFF"
+                          stroke={accentHex}
                           strokeWidth={2}
                           fill="url(#editorialRevGrad)"
                         />
                       </AreaChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="h-full flex items-center justify-center text-xs text-[#71717A]">
+                    <div className="h-full flex items-center justify-center text-xs text-[var(--admin-text-muted)]">
                       No revenue progression data.
                     </div>
                   )}
@@ -1126,29 +1118,29 @@ export default function Analytics() {
                 Booking Status, Rental Amount, Payment Status.
                 Preserves search, status filter, pagination, and links to /admin/bookings.
                -------------------------------------------------------------------- */}
-            <div className="p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3.5">
+            <div className="p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs space-y-3.5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
+                  <h3 className="text-xs font-bold text-[var(--admin-text)]">
                     Recent Bookings Ledger
                   </h3>
-                  <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
+                  <p className="text-[11px] text-[var(--admin-text-muted)]">
                     Live reservation transactions across the platform
                   </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="relative">
-                    <Search className="h-3 w-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#71717A]" />
+                    <Search className="h-3 w-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--admin-text-muted)]" />
                     <input
                       type="text"
-                      placeholder="Search bookings..."
+                      placeholder="Search bookings"
                       value={bookingSearch}
                       onChange={(e) => {
                         setBookingSearch(e.target.value);
                         setBookingPage(1);
                       }}
-                      className="pl-7 pr-2.5 py-1 rounded-md bg-[#F4F4F5] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] text-xs text-[#18181B] dark:text-[#FAFAFA] placeholder:text-[#71717A] w-44 focus:outline-none focus:border-[#635BFF]"
+                      className="pl-7 pr-2.5 py-1 rounded-md bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-xs text-[var(--admin-text)] placeholder:text-[var(--admin-text-muted)] w-44 focus:outline-none focus:border-[var(--admin-success)]"
                     />
                   </div>
 
@@ -1158,7 +1150,7 @@ export default function Analytics() {
                       setBookingStatusFilter(e.target.value);
                       setBookingPage(1);
                     }}
-                    className="px-2.5 py-1 rounded-md bg-[#F4F4F5] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] text-xs text-[#18181B] dark:text-[#FAFAFA] cursor-pointer"
+                    className="px-2.5 py-1 rounded-md bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-xs text-[var(--admin-text)] cursor-pointer"
                   >
                     <option value="all">All Statuses</option>
                     <option value="confirmed">Confirmed</option>
@@ -1170,7 +1162,7 @@ export default function Analytics() {
 
                   <a
                     href="/admin/bookings"
-                    className="px-2.5 py-1 rounded-md border border-[#E4E4E7] dark:border-[#27272A] text-xs text-[#635BFF] hover:bg-[#F4F4F5] dark:hover:bg-[#1A1F2C] flex items-center gap-1 transition-colors"
+                    className="px-2.5 py-1 rounded-md border border-[var(--admin-border)] text-xs text-[var(--admin-success)] hover:bg-[var(--admin-elevated)] flex items-center gap-1 transition-colors"
                   >
                     <span>View All</span>
                     <ArrowUpRight className="h-3 w-3" />
@@ -1181,7 +1173,7 @@ export default function Analytics() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-[#E4E4E7] dark:border-[#27272A] text-[10px] font-mono uppercase text-[#71717A] dark:text-[#A1A1AA]">
+                    <tr className="border-b border-[var(--admin-border)] text-[11px] font-medium text-[var(--admin-text-muted)]">
                       <th className="py-2 px-2.5">Booking ID</th>
                       <th className="py-2 px-2.5">Product</th>
                       <th className="py-2 px-2.5">Customer</th>
@@ -1191,51 +1183,51 @@ export default function Analytics() {
                       <th className="py-2 px-2.5 text-center">Payment Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#E4E4E7] dark:divide-[#27272A]">
+                  <tbody className="divide-y divide-[var(--admin-border)]">
                     {paginatedBookings.length > 0 ? (
                       paginatedBookings.map((b) => (
-                        <tr key={b.id} className="hover:bg-[#F7F7F8] dark:hover:bg-[#1A1F2C]/50 transition-colors">
-                          <td className="py-2.5 px-2.5 font-mono text-[11px] font-medium text-[#635BFF]">
+                        <tr key={b.id} className="hover:bg-[var(--admin-elevated)] transition-colors">
+                          <td className="py-2.5 px-2.5 font-mono text-[11px] font-medium text-[var(--admin-success)]">
                             {b.id}
                           </td>
-                          <td className="py-2.5 px-2.5 font-medium text-[#18181B] dark:text-[#FAFAFA] truncate max-w-[180px]">
+                          <td className="py-2.5 px-2.5 font-medium text-[var(--admin-text)] truncate max-w-45">
                             {b.productTitle}
                           </td>
-                          <td className="py-2.5 px-2.5 text-[#71717A] dark:text-[#A1A1AA]">
+                          <td className="py-2.5 px-2.5 text-[var(--admin-text-muted)]">
                             {b.customerName || "Customer"}
                           </td>
-                          <td className="py-2.5 px-2.5 font-mono text-[11px] text-[#71717A]">
+                          <td className="py-2.5 px-2.5 font-mono text-[11px] text-[var(--admin-text-muted)]">
                             {b.startDate ? `${b.startDate.slice(5)} → ${b.endDate?.slice(5) || ""}` : "Standard"}
                           </td>
-                          <td className="py-2.5 px-2.5 text-right font-mono font-medium text-[#18181B] dark:text-[#FAFAFA]">
+                          <td className="py-2.5 px-2.5 text-right font-mono font-medium text-[var(--admin-text)]">
                             ₹{Number(b.amount || 0).toLocaleString("en-IN")}
                           </td>
                           <td className="py-2.5 px-2.5 text-center">
                             <span
                               className={cn(
-                                "px-2 py-0.5 rounded text-[10px] font-medium capitalize",
+                                "px-2 py-0.5 rounded text-[11px] font-medium capitalize",
                                 b.status === "completed"
-                                  ? "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200/50"
+                                  ? "bg-[var(--admin-elevated)] text-[var(--admin-text)] border border-[var(--admin-border)]"
                                   : b.status === "active"
-                                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/50"
+                                  ? "bg-emerald-500/10 text-[var(--admin-success)] border border-[var(--admin-success)]/20"
                                   : b.status === "confirmed"
-                                  ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/50"
+                                  ? "bg-[var(--admin-elevated)] text-[var(--admin-text-secondary)] border border-[var(--admin-border)]"
                                   : b.status === "cancelled"
-                                  ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200/50"
-                                  : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200/50"
+                                  ? "bg-rose-500/10 text-[var(--admin-error)] border border-[var(--admin-error)]/20"
+                                  : "bg-amber-500/10 text-[var(--admin-warning)] border border-[var(--admin-warning)]/20"
                               )}
                             >
                               {b.status}
                             </span>
                           </td>
-                          <td className="py-2.5 px-2.5 text-center font-mono text-[10px] text-[#71717A]">
+                          <td className="py-2.5 px-2.5 text-center font-mono text-[11px] text-[var(--admin-text-muted)]">
                             {b.paymentStatus || "paid"}
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={7} className="text-center py-6 text-xs text-[#71717A]">
+                        <td colSpan={7} className="text-center py-6 text-xs text-[var(--admin-text-muted)]">
                           No bookings matching criteria.
                         </td>
                       </tr>
@@ -1245,8 +1237,8 @@ export default function Analytics() {
               </div>
 
               {filteredBookings.length > itemsPerPage && (
-                <div className="flex items-center justify-between pt-2 border-t border-[#E4E4E7] dark:border-[#27272A] text-xs">
-                  <span className="text-[#71717A] text-[11px]">
+                <div className="flex items-center justify-between pt-2 border-t border-[var(--admin-border)] text-xs">
+                  <span className="text-[var(--admin-text-muted)] text-[11px]">
                     Showing {(bookingPage - 1) * itemsPerPage + 1} -{" "}
                     {Math.min(bookingPage * itemsPerPage, filteredBookings.length)} of {filteredBookings.length}
                   </span>
@@ -1254,7 +1246,7 @@ export default function Analytics() {
                     <button
                       onClick={() => setBookingPage((p) => Math.max(1, p - 1))}
                       disabled={bookingPage === 1}
-                      className="p-1 rounded border border-[#E4E4E7] dark:border-[#27272A] disabled:opacity-40 cursor-pointer"
+                      className="p-1 rounded border border-[var(--admin-border)] disabled:opacity-40 cursor-pointer"
                     >
                       <ChevronLeft className="h-3 w-3" />
                     </button>
@@ -1266,7 +1258,7 @@ export default function Analytics() {
                         )
                       }
                       disabled={bookingPage * itemsPerPage >= filteredBookings.length}
-                      className="p-1 rounded border border-[#E4E4E7] dark:border-[#27272A] disabled:opacity-40 cursor-pointer"
+                      className="p-1 rounded border border-[var(--admin-border)] disabled:opacity-40 cursor-pointer"
                     >
                       <ChevronRight className="h-3 w-3" />
                     </button>
@@ -1287,24 +1279,24 @@ export default function Analytics() {
             {/* Primary Asymmetric Workspace */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
               {/* Left Column (8 cols): Large Booking Trend Chart */}
-              <div className="lg:col-span-8 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-8 p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs flex flex-col justify-between">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
+                    <h3 className="text-xs font-bold text-[var(--admin-text)]">
                       Booking Trajectory & Comparison
                     </h3>
-                    <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
+                    <p className="text-[11px] text-[var(--admin-text-muted)]">
                       Comparing current interval against preceding equivalent window
                     </p>
                   </div>
                   <div className="flex items-center gap-3 text-xs">
-                    <span className="flex items-center gap-1.5 text-[11px] text-[#18181B] dark:text-[#FAFAFA]">
-                      <span className="h-2 w-2 rounded-full bg-[#635BFF]" />
+                    <span className="flex items-center gap-1.5 text-[11px] text-[var(--admin-text)]">
+                      <span className="h-2 w-2 rounded-full bg-[var(--admin-success)]" />
                       Current
                     </span>
                     {comparePrevious && (
-                      <span className="flex items-center gap-1.5 text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
-                        <span className="h-2 w-2 rounded-full bg-[#94A3B8]" />
+                      <span className="flex items-center gap-1.5 text-[11px] text-[var(--admin-text-muted)]">
+                        <span className="h-2 w-2 rounded-full bg-[var(--admin-text-muted)]" />
                         Previous
                       </span>
                     )}
@@ -1314,32 +1306,26 @@ export default function Analytics() {
                 <div className="h-80 w-full pt-1">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={dataset?.bookingTrend || []}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
-                      <XAxis dataKey="label" stroke="#71717A" fontSize={10} tickLine={false} />
-                      <YAxis stroke="#71717A" fontSize={10} tickLine={false} allowDecimals={false} />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
+                      <XAxis dataKey="label" stroke={mutedHex} fontSize={11} tickLine={false} />
+                      <YAxis stroke={mutedHex} fontSize={11} tickLine={false} allowDecimals={false} />
                       <Tooltip
-                        contentStyle={{
-                          backgroundColor: "#18181B",
-                          borderColor: "#27272A",
-                          borderRadius: "8px",
-                          fontSize: "11px",
-                          color: "#FFFFFF",
-                        }}
+                        contentStyle={tooltipStyle}
                       />
                       <Line
                         type="monotone"
                         dataKey="currentBookings"
                         name="Current"
-                        stroke="#635BFF"
+                        stroke={accentHex}
                         strokeWidth={2.4}
-                        dot={{ r: 2.5, fill: "#635BFF" }}
+                        dot={{ r: 2.5, fill: accentHex }}
                       />
                       {comparePrevious && (
                         <Line
                           type="monotone"
                           dataKey="previousBookings"
                           name="Previous Period"
-                          stroke="#94A3B8"
+                          stroke={prevLineHex}
                           strokeWidth={1.5}
                           strokeDasharray="4 4"
                           dot={false}
@@ -1351,12 +1337,12 @@ export default function Analytics() {
               </div>
 
               {/* Right Column (4 cols): Compact Status Summary */}
-              <div className="lg:col-span-4 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-4 p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs flex flex-col justify-between">
                 <div>
-                  <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
+                  <h3 className="text-xs font-bold text-[var(--admin-text)]">
                     Confirmed vs Completed
                   </h3>
-                  <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
+                  <p className="text-[11px] text-[var(--admin-text-muted)]">
                     Fulfillment resolution ratio
                   </p>
                 </div>
@@ -1364,14 +1350,14 @@ export default function Analytics() {
                 <div className="py-4 space-y-4 my-auto">
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-xs">
-                      <span className="text-[#71717A] dark:text-[#A1A1AA]">Confirmed Bookings</span>
-                      <span className="font-mono font-bold text-[#18181B] dark:text-[#FAFAFA]">
+                      <span className="text-[var(--admin-text-muted)]">Confirmed Bookings</span>
+                      <span className="font-mono font-bold text-[var(--admin-text)]">
                         {kpis?.confirmedBookings.current}
                       </span>
                     </div>
-                    <div className="h-2 w-full bg-[#F4F4F5] dark:bg-[#1E1E1E] rounded-full overflow-hidden">
+                    <div className="h-2 w-full bg-[var(--admin-elevated)] rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-blue-500 rounded-full"
+                        className="h-full bg-[var(--admin-text-secondary)] rounded-full"
                         style={{
                           width: `${Math.min(100, ((kpis?.confirmedBookings.current || 0) / Math.max(1, kpis?.totalBookings.current || 1)) * 100)}%`,
                         }}
@@ -1381,14 +1367,14 @@ export default function Analytics() {
 
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-xs">
-                      <span className="text-[#71717A] dark:text-[#A1A1AA]">Completed Rentals</span>
-                      <span className="font-mono font-bold text-[#18181B] dark:text-[#FAFAFA]">
+                      <span className="text-[var(--admin-text-muted)]">Completed Rentals</span>
+                      <span className="font-mono font-bold text-[var(--admin-text)]">
                         {kpis?.completedRentals.current}
                       </span>
                     </div>
-                    <div className="h-2 w-full bg-[#F4F4F5] dark:bg-[#1E1E1E] rounded-full overflow-hidden">
+                    <div className="h-2 w-full bg-[var(--admin-elevated)] rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-purple-500 rounded-full"
+                        className="h-full bg-[var(--admin-text-muted)] rounded-full"
                         style={{
                           width: `${Math.min(100, ((kpis?.completedRentals.current || 0) / Math.max(1, kpis?.totalBookings.current || 1)) * 100)}%`,
                         }}
@@ -1398,14 +1384,14 @@ export default function Analytics() {
 
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-xs">
-                      <span className="text-[#71717A] dark:text-[#A1A1AA]">Cancelled Bookings</span>
-                      <span className="font-mono font-bold text-[#DC4545]">
+                      <span className="text-[var(--admin-text-muted)]">Cancelled Bookings</span>
+                      <span className="font-mono font-bold text-[var(--admin-error)]">
                         {kpis?.cancelledBookings.current}
                       </span>
                     </div>
-                    <div className="h-2 w-full bg-[#F4F4F5] dark:bg-[#1E1E1E] rounded-full overflow-hidden">
+                    <div className="h-2 w-full bg-[var(--admin-elevated)] rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-[#DC4545] rounded-full"
+                        className="h-full bg-[var(--admin-error)] rounded-full"
                         style={{
                           width: `${Math.min(100, ((kpis?.cancelledBookings.current || 0) / Math.max(1, kpis?.totalBookings.current || 1)) * 100)}%`,
                         }}
@@ -1414,9 +1400,9 @@ export default function Analytics() {
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between text-xs">
-                  <span className="text-[#71717A]">Cancellation Rate</span>
-                  <span className="font-mono font-bold text-[#DC4545]">
+                <div className="pt-3 border-t border-[var(--admin-border)] flex items-center justify-between text-xs">
+                  <span className="text-[var(--admin-text-muted)]">Cancellation Rate</span>
+                  <span className="font-mono font-bold text-[var(--admin-error)]">
                     {kpis?.cancellationRate.current}%
                   </span>
                 </div>
@@ -1424,54 +1410,54 @@ export default function Analytics() {
             </div>
 
             {/* Expandable Advanced Analytics: Booking Funnel */}
-            <div className="rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs overflow-hidden">
+            <div className="rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs overflow-hidden">
               <button
                 onClick={() => setShowFunnelSection(!showFunnelSection)}
-                className="w-full p-4 flex items-center justify-between text-left cursor-pointer hover:bg-[#F7F7F8] dark:hover:bg-[#1A1F2C]/50 transition-colors"
+                className="w-full p-4 flex items-center justify-between text-left cursor-pointer hover:bg-[var(--admin-elevated)] transition-colors"
               >
                 <div className="flex items-center gap-2">
-                  <SlidersHorizontal className="h-4 w-4 text-[#635BFF]" />
+                  <SlidersHorizontal className="h-4 w-4 text-[var(--admin-success)]" />
                   <div>
-                    <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
+                    <h3 className="text-xs font-bold text-[var(--admin-text)]">
                       Booking Funnel & Conversion Journey
                     </h3>
-                    <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
+                    <p className="text-[11px] text-[var(--admin-text-muted)]">
                       Progression from product views and cart additions to verified completions
                     </p>
                   </div>
                 </div>
                 {showFunnelSection ? (
-                  <ChevronUp className="h-4 w-4 text-[#71717A]" />
+                  <ChevronUp className="h-4 w-4 text-[var(--admin-text-muted)]" />
                 ) : (
-                  <ChevronDown className="h-4 w-4 text-[#71717A]" />
+                  <ChevronDown className="h-4 w-4 text-[var(--admin-text-muted)]" />
                 )}
               </button>
 
               {showFunnelSection && dataset?.funnel && (
-                <div className="p-5 pt-1 border-t border-[#E4E4E7] dark:border-[#27272A] space-y-4">
+                <div className="p-5 pt-1 border-t border-[var(--admin-border)] space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                     {dataset.funnel.stages.map((stage, idx) => (
                       <div
                         key={stage.name}
-                        className="p-3 rounded-lg bg-[#F7F7F8] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] space-y-1.5"
+                        className="p-3 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] space-y-1.5"
                       >
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-mono font-semibold uppercase text-[#71717A]">
+                          <span className="text-[11px] font-medium text-[var(--admin-text-muted)]">
                             Step {idx + 1}
                           </span>
-                          <span className="text-[10px] font-mono text-[#635BFF] font-bold">
+                          <span className="text-[11px] font-mono text-[var(--admin-success)] font-bold">
                             {stage.conversionRate}%
                           </span>
                         </div>
-                        <div className="text-xs font-semibold text-[#18181B] dark:text-[#FAFAFA]">
+                        <div className="text-xs font-semibold text-[var(--admin-text)]">
                           {stage.name}
                         </div>
-                        <div className="text-lg font-bold font-mono text-[#18181B] dark:text-[#FAFAFA]">
+                        <div className="text-lg font-bold font-mono text-[var(--admin-text)]">
                           {stage.count.toLocaleString()}
                         </div>
-                        <div className="h-1.5 w-full bg-[#E4E4E7] dark:bg-[#1E1E1E] rounded-full overflow-hidden mt-1">
+                        <div className="h-1.5 w-full bg-[var(--admin-elevated)] rounded-full overflow-hidden mt-1">
                           <div
-                            className="h-full bg-[#635BFF] rounded-full"
+                            className="h-full bg-[var(--admin-success)] rounded-full"
                             style={{ width: `${Math.min(100, stage.conversionRate || 0)}%` }}
                           />
                         </div>
@@ -1484,61 +1470,49 @@ export default function Analytics() {
 
             {/* Secondary Visualizations for Bookings */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              <div className="p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
-                <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide mb-1">
+              <div className="p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs">
+                <h3 className="text-xs font-bold text-[var(--admin-text)] mb-1">
                   Booking Breakdown by Category
                 </h3>
-                <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA] mb-4">
+                <p className="text-[11px] text-[var(--admin-text-muted)] mb-4">
                   Rental volume distribution across tech categories
                 </p>
                 <div className="h-60 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={dataset?.categoryBreakdown || []}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
-                      <XAxis dataKey="name" stroke="#71717A" fontSize={10} tickLine={false} />
-                      <YAxis stroke="#71717A" fontSize={10} tickLine={false} allowDecimals={false} />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
+                      <XAxis dataKey="name" stroke={mutedHex} fontSize={11} tickLine={false} />
+                      <YAxis stroke={mutedHex} fontSize={11} tickLine={false} allowDecimals={false} />
                       <Tooltip
-                        contentStyle={{
-                          backgroundColor: "#18181B",
-                          borderColor: "#27272A",
-                          borderRadius: "8px",
-                          fontSize: "11px",
-                          color: "#FFFFFF",
-                        }}
+                        contentStyle={tooltipStyle}
                       />
-                      <Bar dataKey="bookings" fill="#635BFF" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="bookings" fill={accentHex} radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              <div className="p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
-                <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide mb-1">
+              <div className="p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs">
+                <h3 className="text-xs font-bold text-[var(--admin-text)] mb-1">
                   Daily Booking Density
                 </h3>
-                <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA] mb-4">
+                <p className="text-[11px] text-[var(--admin-text-muted)] mb-4">
                   Booking velocity across intervals
                 </p>
                 <div className="h-60 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={dataset?.bookingTrend || []}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
-                      <XAxis dataKey="label" stroke="#71717A" fontSize={10} tickLine={false} />
-                      <YAxis stroke="#71717A" fontSize={10} tickLine={false} allowDecimals={false} />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
+                      <XAxis dataKey="label" stroke={mutedHex} fontSize={11} tickLine={false} />
+                      <YAxis stroke={mutedHex} fontSize={11} tickLine={false} allowDecimals={false} />
                       <Tooltip
-                        contentStyle={{
-                          backgroundColor: "#18181B",
-                          borderColor: "#27272A",
-                          borderRadius: "8px",
-                          fontSize: "11px",
-                          color: "#FFFFFF",
-                        }}
+                        contentStyle={tooltipStyle}
                       />
                       <Area
                         type="monotone"
                         dataKey="currentBookings"
-                        stroke="#16865C"
-                        fill="#16865C"
+                        stroke={accentHex}
+                        fill={accentHex}
                         fillOpacity={0.15}
                       />
                     </AreaChart>
@@ -1548,22 +1522,22 @@ export default function Analytics() {
             </div>
 
             {/* Detailed Records Table */}
-            <div className="p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3.5">
+            <div className="p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs space-y-3.5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <h3 className="text-xs font-bold uppercase tracking-wide text-[#18181B] dark:text-[#FAFAFA]">
+                <h3 className="text-xs font-bold text-[var(--admin-text)]">
                   Detailed Booking Records
                 </h3>
                 <div className="relative">
-                  <Search className="h-3 w-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#71717A]" />
+                  <Search className="h-3 w-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--admin-text-muted)]" />
                   <input
                     type="text"
-                    placeholder="Search bookings..."
+                    placeholder="Search bookings"
                     value={bookingSearch}
                     onChange={(e) => {
                       setBookingSearch(e.target.value);
                       setBookingPage(1);
                     }}
-                    className="pl-7 pr-2.5 py-1 rounded-md bg-[#F4F4F5] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] text-xs w-44"
+                    className="pl-7 pr-2.5 py-1 rounded-md bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-xs w-44"
                   />
                 </div>
               </div>
@@ -1571,7 +1545,7 @@ export default function Analytics() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-[#E4E4E7] dark:border-[#27272A] text-[10px] font-mono uppercase text-[#71717A]">
+                    <tr className="border-b border-[var(--admin-border)] text-[11px] font-medium text-[var(--admin-text-muted)]">
                       <th className="py-2 px-2.5">ID</th>
                       <th className="py-2 px-2.5">Gear Item</th>
                       <th className="py-2 px-2.5">Customer</th>
@@ -1580,21 +1554,21 @@ export default function Analytics() {
                       <th className="py-2 px-2.5 text-center">Delivery</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#E4E4E7] dark:divide-[#27272A]">
+                  <tbody className="divide-y divide-[var(--admin-border)]">
                     {paginatedBookings.map((b) => (
-                      <tr key={b.id} className="hover:bg-[#F7F7F8] dark:hover:bg-[#1A1F2C]/40">
-                        <td className="py-2.5 px-2.5 font-mono text-[11px] font-medium text-[#635BFF]">{b.id}</td>
-                        <td className="py-2.5 px-2.5 font-medium truncate max-w-[200px]">{b.productTitle}</td>
-                        <td className="py-2.5 px-2.5 text-[#71717A]">{b.customerName}</td>
+                      <tr key={b.id} className="hover:bg-[var(--admin-elevated)]">
+                        <td className="py-2.5 px-2.5 font-mono text-[11px] font-medium text-[var(--admin-success)]">{b.id}</td>
+                        <td className="py-2.5 px-2.5 font-medium truncate max-w-52">{b.productTitle}</td>
+                        <td className="py-2.5 px-2.5 text-[var(--admin-text-muted)]">{b.customerName}</td>
                         <td className="py-2.5 px-2.5 text-right font-mono font-medium">
                           ₹{Number(b.amount || 0).toLocaleString("en-IN")}
                         </td>
                         <td className="py-2.5 px-2.5 text-center">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-medium capitalize bg-black/5 dark:bg-white/10">
+                          <span className="px-2 py-0.5 rounded text-[11px] font-medium capitalize bg-[var(--admin-elevated)] text-[var(--admin-text-secondary)] border border-[var(--admin-border)]">
                             {b.status}
                           </span>
                         </td>
-                        <td className="py-2.5 px-2.5 text-center text-[10px] font-mono text-[#71717A]">
+                        <td className="py-2.5 px-2.5 text-center text-[11px] font-mono text-[var(--admin-text-muted)]">
                           {b.deliveryStatus || "DELIVERED"}
                         </td>
                       </tr>
@@ -1614,38 +1588,38 @@ export default function Analytics() {
         {activeTab === "Products" && (
           <div className="space-y-5">
             {/* Utilization Metrics Strip */}
-            <div className="rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs overflow-hidden">
-              <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-[#E4E4E7] dark:divide-[#27272A]">
+            <div className="rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs overflow-hidden">
+              <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-[var(--admin-border)]">
                 <div className="p-4">
-                  <span className="text-[11px] font-medium text-[#71717A]">Eligible Products</span>
-                  <div className="text-2xl font-bold font-mono mt-1 text-[#18181B] dark:text-[#FAFAFA]">
+                  <span className="text-[11px] font-medium text-[var(--admin-text-muted)]">Eligible Products</span>
+                  <div className="text-2xl font-bold font-mono mt-1 text-[var(--admin-text)]">
                     {dataset?.productUtilization.totalEligibleProducts}
                   </div>
-                  <span className="text-[10px] text-[#71717A]">Active rentable fleet</span>
+                  <span className="text-[11px] text-[var(--admin-text-muted)]">Active rentable fleet</span>
                 </div>
 
                 <div className="p-4">
-                  <span className="text-[11px] font-medium text-[#71717A]">Rentable Product-Days</span>
-                  <div className="text-2xl font-bold font-mono mt-1 text-[#18181B] dark:text-[#FAFAFA]">
+                  <span className="text-[11px] font-medium text-[var(--admin-text-muted)]">Rentable Product-Days</span>
+                  <div className="text-2xl font-bold font-mono mt-1 text-[var(--admin-text)]">
                     {dataset?.productUtilization.totalRentableDays.toLocaleString()}
                   </div>
-                  <span className="text-[10px] text-[#71717A]">Total capacity in interval</span>
+                  <span className="text-[11px] text-[var(--admin-text-muted)]">Total capacity in interval</span>
                 </div>
 
                 <div className="p-4">
-                  <span className="text-[11px] font-medium text-[#71717A]">Occupied Product-Days</span>
-                  <div className="text-2xl font-bold font-mono mt-1 text-[#18181B] dark:text-[#FAFAFA]">
+                  <span className="text-[11px] font-medium text-[var(--admin-text-muted)]">Occupied Product-Days</span>
+                  <div className="text-2xl font-bold font-mono mt-1 text-[var(--admin-text)]">
                     {dataset?.productUtilization.totalOccupiedDays.toLocaleString()}
                   </div>
-                  <span className="text-[10px] text-[#71717A]">Days rented</span>
+                  <span className="text-[11px] text-[var(--admin-text-muted)]">Days rented</span>
                 </div>
 
-                <div className="p-4 bg-[#FAFAFB] dark:bg-[#1E1E1E]">
-                  <span className="text-[11px] font-medium text-[#635BFF]">Fleet Utilization Rate</span>
-                  <div className="text-2xl font-bold font-mono text-[#635BFF] mt-1">
+                <div className="p-4 bg-[var(--admin-elevated)]">
+                  <span className="text-[11px] font-medium text-[var(--admin-success)]">Fleet Utilization Rate</span>
+                  <div className="text-2xl font-bold font-mono text-[var(--admin-success)] mt-1">
                     {dataset?.productUtilization.utilizationRate}%
                   </div>
-                  <span className="text-[10px] text-[#71717A]">Occupied / Total Days × 100</span>
+                  <span className="text-[11px] text-[var(--admin-text-muted)]">Occupied / Total Days × 100</span>
                 </div>
               </div>
             </div>
@@ -1653,23 +1627,23 @@ export default function Analytics() {
             {/* Primary Asymmetric Workspace: Occupied vs Available Analysis */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
               {/* Left Column (8 cols): Occupied vs Available Capacity Trend */}
-              <div className="lg:col-span-8 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-8 p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs flex flex-col justify-between">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
+                    <h3 className="text-xs font-bold text-[var(--admin-text)]">
                       Occupied vs Available Capacity Analysis
                     </h3>
-                    <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
+                    <p className="text-[11px] text-[var(--admin-text-muted)]">
                       Fleet rental utilization trends across selected window
                     </p>
                   </div>
                   <div className="flex items-center gap-3 text-xs">
-                    <span className="flex items-center gap-1.5 text-[11px] text-[#18181B] dark:text-[#FAFAFA]">
-                      <span className="h-2 w-2 rounded-full bg-[#635BFF]" />
+                    <span className="flex items-center gap-1.5 text-[11px] text-[var(--admin-text)]">
+                      <span className="h-2 w-2 rounded-full bg-[var(--admin-success)]" />
                       Occupied Days
                     </span>
-                    <span className="flex items-center gap-1.5 text-[11px] text-[#71717A]">
-                      <span className="h-2 w-2 rounded-full bg-[#10B981]" />
+                    <span className="flex items-center gap-1.5 text-[11px] text-[var(--admin-text-muted)]">
+                      <span className="h-2 w-2 rounded-full bg-[var(--admin-success)]" />
                       Fleet Capacity
                     </span>
                   </div>
@@ -1678,24 +1652,18 @@ export default function Analytics() {
                 <div className="h-72 w-full pt-1">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={dataset?.bookingTrend || []}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
-                      <XAxis dataKey="label" stroke="#71717A" fontSize={10} tickLine={false} />
-                      <YAxis stroke="#71717A" fontSize={10} tickLine={false} />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
+                      <XAxis dataKey="label" stroke={mutedHex} fontSize={11} tickLine={false} />
+                      <YAxis stroke={mutedHex} fontSize={11} tickLine={false} />
                       <Tooltip
-                        contentStyle={{
-                          backgroundColor: "#18181B",
-                          borderColor: "#27272A",
-                          borderRadius: "8px",
-                          fontSize: "11px",
-                          color: "#FFFFFF",
-                        }}
+                        contentStyle={tooltipStyle}
                       />
                       <Area
                         type="monotone"
                         dataKey="currentBookings"
                         name="Occupied"
-                        stroke="#635BFF"
-                        fill="#635BFF"
+                        stroke={accentHex}
+                        fill={accentHex}
                         fillOpacity={0.16}
                       />
                     </AreaChart>
@@ -1704,12 +1672,12 @@ export default function Analytics() {
               </div>
 
               {/* Right Column (4 cols): Category Comparison & Demand Distribution */}
-              <div className="lg:col-span-4 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-4 p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs flex flex-col justify-between">
                 <div>
-                  <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
+                  <h3 className="text-xs font-bold text-[var(--admin-text)]">
                     Category Utilization
                   </h3>
-                  <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
+                  <p className="text-[11px] text-[var(--admin-text-muted)]">
                     Relative share of fleet utilization
                   </p>
                 </div>
@@ -1718,16 +1686,16 @@ export default function Analytics() {
                   {dataset?.categoryBreakdown.map((cat, idx) => (
                     <div key={cat.name} className="space-y-1">
                       <div className="flex justify-between text-xs">
-                        <span className="text-[#71717A] dark:text-[#A1A1AA]">{cat.name}</span>
-                        <span className="font-mono font-semibold text-[#18181B] dark:text-[#FAFAFA]">
+                        <span className="text-[var(--admin-text-muted)]">{cat.name}</span>
+                        <span className="font-mono font-semibold text-[var(--admin-text)]">
                           {cat.percentage}%
                         </span>
                       </div>
-                      <div className="h-1.5 w-full bg-[#F4F4F5] dark:bg-[#1E1E1E] rounded-full overflow-hidden">
+                      <div className="h-1.5 w-full bg-[var(--admin-elevated)] rounded-full overflow-hidden">
                         <div
                           className="h-full rounded-full"
                           style={{
-                            backgroundColor: CATEGORY_COLORS[idx % CATEGORY_COLORS.length],
+                            backgroundColor: categoryColors[idx % categoryColors.length],
                             width: `${cat.percentage}%`,
                           }}
                         />
@@ -1736,9 +1704,9 @@ export default function Analytics() {
                   ))}
                 </div>
 
-                <div className="pt-3 border-t border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between text-xs">
-                  <span className="text-[#71717A]">Active Fleet</span>
-                  <span className="font-mono font-bold text-[#635BFF]">
+                <div className="pt-3 border-t border-[var(--admin-border)] flex items-center justify-between text-xs">
+                  <span className="text-[var(--admin-text-muted)]">Active Fleet</span>
+                  <span className="font-mono font-bold text-[var(--admin-success)]">
                     {dataset?.productUtilization.totalEligibleProducts} listings
                   </span>
                 </div>
@@ -1746,22 +1714,22 @@ export default function Analytics() {
             </div>
 
             {/* Product-Level Table */}
-            <div className="p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3">
+            <div className="p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-wide text-[#18181B] dark:text-[#FAFAFA]">
+                <h3 className="text-xs font-bold text-[var(--admin-text)]">
                   Gear Utilization & Turnover Ledger
                 </h3>
                 <div className="relative">
-                  <Search className="h-3 w-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#71717A]" />
+                  <Search className="h-3 w-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--admin-text-muted)]" />
                   <input
                     type="text"
-                    placeholder="Search gear..."
+                    placeholder="Search gear"
                     value={productSearch}
                     onChange={(e) => {
                       setProductSearch(e.target.value);
                       setProductPage(1);
                     }}
-                    className="pl-7 pr-2.5 py-1 rounded-md bg-[#F4F4F5] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] text-xs w-44"
+                    className="pl-7 pr-2.5 py-1 rounded-md bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-xs w-44"
                   />
                 </div>
               </div>
@@ -1769,7 +1737,7 @@ export default function Analytics() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-[#E4E4E7] dark:border-[#27272A] text-[10px] font-mono uppercase text-[#71717A]">
+                    <tr className="border-b border-[var(--admin-border)] text-[11px] font-medium text-[var(--admin-text-muted)]">
                       <th className="py-2 px-2.5">Title</th>
                       <th className="py-2 px-2.5">Category</th>
                       <th className="py-2 px-2.5 text-right">Daily Rate</th>
@@ -1779,15 +1747,15 @@ export default function Analytics() {
                       <th className="py-2 px-2.5 text-center">Utilization</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#E4E4E7] dark:divide-[#27272A]">
+                  <tbody className="divide-y divide-[var(--admin-border)]">
                     {paginatedProducts.map((p) => (
-                      <tr key={p.id} className="hover:bg-[#F7F7F8] dark:hover:bg-[#1A1F2C]/40">
+                      <tr key={p.id} className="hover:bg-[var(--admin-elevated)]">
                         <td className="py-2.5 px-2.5 font-medium">{p.title}</td>
-                        <td className="py-2.5 px-2.5 text-[#71717A]">{p.category}</td>
+                        <td className="py-2.5 px-2.5 text-[var(--admin-text-muted)]">{p.category}</td>
                         <td className="py-2.5 px-2.5 text-right font-mono">₹{p.price.toLocaleString()}</td>
                         <td className="py-2.5 px-2.5 text-center font-mono font-medium">{p.totalRentals}</td>
-                        <td className="py-2.5 px-2.5 text-center font-mono text-[#71717A]">{p.occupiedDays}d</td>
-                        <td className="py-2.5 px-2.5 text-right font-mono font-medium text-[#635BFF]">
+                        <td className="py-2.5 px-2.5 text-center font-mono text-[var(--admin-text-muted)]">{p.occupiedDays}d</td>
+                        <td className="py-2.5 px-2.5 text-right font-mono font-medium text-[var(--admin-success)]">
                           ₹{p.revenue.toLocaleString("en-IN")}
                         </td>
                         <td className="py-2.5 px-2.5 text-center font-mono text-[11px] font-medium">
@@ -1810,35 +1778,35 @@ export default function Analytics() {
         {activeTab === "Users" && (
           <div className="space-y-5">
             {/* User Typology Strip */}
-            <div className="rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs overflow-hidden">
-              <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-[#E4E4E7] dark:divide-[#27272A]">
+            <div className="rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs overflow-hidden">
+              <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-[var(--admin-border)]">
                 <div className="p-4">
-                  <span className="text-[11px] font-medium text-[#71717A]">Total Accounts</span>
-                  <div className="text-2xl font-bold font-mono mt-1 text-[#18181B] dark:text-[#FAFAFA]">
+                  <span className="text-[11px] font-medium text-[var(--admin-text-muted)]">Total Accounts</span>
+                  <div className="text-2xl font-bold font-mono mt-1 text-[var(--admin-text)]">
                     {dataset?.userMetrics.totalUsers}
                   </div>
-                  <span className="text-[10px] text-[#71717A]">Registered platform accounts</span>
+                  <span className="text-[11px] text-[var(--admin-text-muted)]">Registered platform accounts</span>
                 </div>
                 <div className="p-4">
-                  <span className="text-[11px] font-medium text-[#16865C]">New Registrations</span>
-                  <div className="text-2xl font-bold font-mono text-[#16865C] mt-1">
+                  <span className="text-[11px] font-medium text-[var(--admin-success)]">New Registrations</span>
+                  <div className="text-2xl font-bold font-mono text-[var(--admin-success)] mt-1">
                     +{dataset?.userMetrics.newUsersInPeriod}
                   </div>
-                  <span className="text-[10px] text-[#71717A]">Joined in selected interval</span>
+                  <span className="text-[11px] text-[var(--admin-text-muted)]">Joined in selected interval</span>
                 </div>
                 <div className="p-4">
-                  <span className="text-[11px] font-medium text-[#71717A]">Renters</span>
-                  <div className="text-2xl font-bold font-mono mt-1 text-[#18181B] dark:text-[#FAFAFA]">
+                  <span className="text-[11px] font-medium text-[var(--admin-text-muted)]">Renters</span>
+                  <div className="text-2xl font-bold font-mono mt-1 text-[var(--admin-text)]">
                     {dataset?.userMetrics.rentersCount}
                   </div>
-                  <span className="text-[10px] text-[#71717A]">Gear consumers</span>
+                  <span className="text-[11px] text-[var(--admin-text-muted)]">Gear consumers</span>
                 </div>
                 <div className="p-4">
-                  <span className="text-[11px] font-medium text-[#71717A]">Vendors / Lenders</span>
-                  <div className="text-2xl font-bold font-mono mt-1 text-[#18181B] dark:text-[#FAFAFA]">
+                  <span className="text-[11px] font-medium text-[var(--admin-text-muted)]">Vendors / Lenders</span>
+                  <div className="text-2xl font-bold font-mono mt-1 text-[var(--admin-text)]">
                     {dataset?.userMetrics.vendorsCount}
                   </div>
-                  <span className="text-[10px] text-[#71717A]">Gear providers</span>
+                  <span className="text-[11px] text-[var(--admin-text-muted)]">Gear providers</span>
                 </div>
               </div>
             </div>
@@ -1846,17 +1814,17 @@ export default function Analytics() {
             {/* Primary Asymmetric Workspace: Registration Trends vs Renter/Vendor Distribution */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
               {/* Left Column (8 cols): Registration Trends Line Chart */}
-              <div className="lg:col-span-8 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-8 p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs flex flex-col justify-between">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
+                    <h3 className="text-xs font-bold text-[var(--admin-text)]">
                       User Registration Trends
                     </h3>
-                    <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
+                    <p className="text-[11px] text-[var(--admin-text-muted)]">
                       Daily user acquisition volume over selected period
                     </p>
                   </div>
-                  <span className="text-[11px] font-mono text-[#16865C]">
+                  <span className="text-[11px] font-mono text-[var(--admin-success)]">
                     +{dataset?.userMetrics.newUsersInPeriod} new accounts
                   </span>
                 </div>
@@ -1864,25 +1832,19 @@ export default function Analytics() {
                 <div className="h-72 w-full pt-1">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={dataset?.userMetrics.userTrend || []}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
-                      <XAxis dataKey="label" stroke="#71717A" fontSize={10} tickLine={false} />
-                      <YAxis stroke="#71717A" fontSize={10} tickLine={false} allowDecimals={false} />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
+                      <XAxis dataKey="label" stroke={mutedHex} fontSize={11} tickLine={false} />
+                      <YAxis stroke={mutedHex} fontSize={11} tickLine={false} allowDecimals={false} />
                       <Tooltip
-                        contentStyle={{
-                          backgroundColor: "#18181B",
-                          borderColor: "#27272A",
-                          borderRadius: "8px",
-                          fontSize: "11px",
-                          color: "#FFFFFF",
-                        }}
+                        contentStyle={tooltipStyle}
                       />
                       <Line
                         type="monotone"
                         dataKey="count"
                         name="New Signups"
-                        stroke="#635BFF"
+                        stroke={accentHex}
                         strokeWidth={2.4}
-                        dot={{ r: 3, fill: "#635BFF" }}
+                        dot={{ r: 3, fill: accentHex }}
                       />
                     </LineChart>
                   </ResponsiveContainer>
@@ -1890,57 +1852,57 @@ export default function Analytics() {
               </div>
 
               {/* Right Column (4 cols): Renter vs Vendor Distribution */}
-              <div className="lg:col-span-4 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-4 p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs flex flex-col justify-between">
                 <div>
-                  <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
+                  <h3 className="text-xs font-bold text-[var(--admin-text)]">
                     Renter vs Vendor Distribution
                   </h3>
-                  <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
+                  <p className="text-[11px] text-[var(--admin-text-muted)]">
                     Platform actor typology
                   </p>
                 </div>
 
                 <div className="space-y-3.5 my-auto py-3">
-                  <div className="p-3 rounded-lg bg-[#F7F7F8] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between">
+                  <div className="p-3 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] flex items-center justify-between">
                     <div>
-                      <span className="font-semibold text-xs block text-[#18181B] dark:text-[#FAFAFA]">
+                      <span className="font-semibold text-xs block text-[var(--admin-text)]">
                         Verified Renters
                       </span>
-                      <span className="text-[10px] text-[#71717A]">Demand side active consumers</span>
+                      <span className="text-[11px] text-[var(--admin-text-muted)]">Demand side active consumers</span>
                     </div>
-                    <span className="font-mono text-lg font-bold text-[#18181B] dark:text-[#FAFAFA]">
+                    <span className="font-mono text-lg font-bold text-[var(--admin-text)]">
                       {dataset?.userMetrics.rentersCount}
                     </span>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-[#F7F7F8] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between">
+                  <div className="p-3 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] flex items-center justify-between">
                     <div>
-                      <span className="font-semibold text-xs block text-[#18181B] dark:text-[#FAFAFA]">
+                      <span className="font-semibold text-xs block text-[var(--admin-text)]">
                         Verified Vendors
                       </span>
-                      <span className="text-[10px] text-[#71717A]">Supply side equipment owners</span>
+                      <span className="text-[11px] text-[var(--admin-text-muted)]">Supply side equipment owners</span>
                     </div>
-                    <span className="font-mono text-lg font-bold text-[#635BFF]">
+                    <span className="font-mono text-lg font-bold text-[var(--admin-success)]">
                       {dataset?.userMetrics.vendorsCount}
                     </span>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-[#F7F7F8] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between">
+                  <div className="p-3 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] flex items-center justify-between">
                     <div>
-                      <span className="font-semibold text-xs block text-[#18181B] dark:text-[#FAFAFA]">
+                      <span className="font-semibold text-xs block text-[var(--admin-text)]">
                         Staff Administrators
                       </span>
-                      <span className="text-[10px] text-[#71717A]">Platform operators</span>
+                      <span className="text-[11px] text-[var(--admin-text-muted)]">Platform operators</span>
                     </div>
-                    <span className="font-mono text-lg font-bold text-[#71717A]">
+                    <span className="font-mono text-lg font-bold text-[var(--admin-text-muted)]">
                       {dataset?.userMetrics.adminsCount}
                     </span>
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-[#E4E4E7] dark:border-[#27272A] text-[11px] text-[#71717A] flex justify-between">
+                <div className="pt-3 border-t border-[var(--admin-border)] text-[11px] text-[var(--admin-text-muted)] flex justify-between">
                   <span>Supply-to-Demand Ratio</span>
-                  <span className="font-mono font-semibold text-[#18181B] dark:text-[#FAFAFA]">
+                  <span className="font-mono font-semibold text-[var(--admin-text)]">
                     1 :{" "}
                     {dataset?.userMetrics.vendorsCount && dataset.userMetrics.vendorsCount > 0
                       ? Math.round(dataset.userMetrics.rentersCount / dataset.userMetrics.vendorsCount)
@@ -1960,48 +1922,48 @@ export default function Analytics() {
         {activeTab === "Delivery" && (
           <div className="space-y-5">
             {/* Delivery Metric Strip */}
-            <div className="rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs overflow-hidden">
-              <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-[#E4E4E7] dark:divide-[#27272A]">
+            <div className="rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs overflow-hidden">
+              <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-[var(--admin-border)]">
                 <div className="p-4">
-                  <span className="text-[11px] font-medium text-[#71717A]">Assigned Dispatches</span>
-                  <div className="text-2xl font-bold font-mono mt-1 text-[#18181B] dark:text-[#FAFAFA]">
+                  <span className="text-[11px] font-medium text-[var(--admin-text-muted)]">Assigned Dispatches</span>
+                  <div className="text-2xl font-bold font-mono mt-1 text-[var(--admin-text)]">
                     {dataset?.deliveryMetrics.totalAssigned}
                   </div>
-                  <span className="text-[10px] text-[#71717A]">Field dispatches</span>
+                  <span className="text-[11px] text-[var(--admin-text-muted)]">Field dispatches</span>
                 </div>
                 <div className="p-4">
-                  <span className="text-[11px] font-medium text-[#16865C]">Delivered Orders</span>
-                  <div className="text-2xl font-bold font-mono text-[#16865C] mt-1">
+                  <span className="text-[11px] font-medium text-[var(--admin-success)]">Delivered Orders</span>
+                  <div className="text-2xl font-bold font-mono text-[var(--admin-success)] mt-1">
                     {dataset?.deliveryMetrics.completed}
                   </div>
-                  <span className="text-[10px] text-[#71717A]">Successfully handed over</span>
+                  <span className="text-[11px] text-[var(--admin-text-muted)]">Successfully handed over</span>
                 </div>
                 <div className="p-4">
-                  <span className="text-[11px] font-medium text-[#71717A]">In-Transit</span>
-                  <div className="text-2xl font-bold font-mono mt-1 text-[#18181B] dark:text-[#FAFAFA]">
+                  <span className="text-[11px] font-medium text-[var(--admin-text-muted)]">In-Transit</span>
+                  <div className="text-2xl font-bold font-mono mt-1 text-[var(--admin-text)]">
                     {dataset?.deliveryMetrics.inTransit}
                   </div>
-                  <span className="text-[10px] text-[#71717A]">En route dispatches</span>
+                  <span className="text-[11px] text-[var(--admin-text-muted)]">En route dispatches</span>
                 </div>
-                <div className="p-4 bg-[#FAFAFB] dark:bg-[#1E1E1E]">
-                  <span className="text-[11px] font-medium text-[#635BFF]">Dual-PIN Compliance</span>
-                  <div className="text-2xl font-bold font-mono text-[#635BFF] mt-1">
+                <div className="p-4 bg-[var(--admin-elevated)]">
+                  <span className="text-[11px] font-medium text-[var(--admin-success)]">Dual-PIN Compliance</span>
+                  <div className="text-2xl font-bold font-mono text-[var(--admin-success)] mt-1">
                     {dataset?.deliveryMetrics.pinVerificationRate}%
                   </div>
-                  <span className="text-[10px] text-[#71717A]">Handover verification</span>
+                  <span className="text-[11px] text-[var(--admin-text-muted)]">Handover verification</span>
                 </div>
               </div>
             </div>
 
             {/* Asymmetric Workspace: Performance Trend vs Pickup-vs-Handover Dual-PIN */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-              <div className="lg:col-span-8 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-8 p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs flex flex-col justify-between">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
+                    <h3 className="text-xs font-bold text-[var(--admin-text)]">
                       Delivery Performance Trends
                     </h3>
-                    <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
+                    <p className="text-[11px] text-[var(--admin-text-muted)]">
                       Dispatch resolution speed and completion rates
                     </p>
                   </div>
@@ -2010,37 +1972,31 @@ export default function Analytics() {
                 <div className="h-72 w-full pt-1">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={dataset?.bookingTrend || []}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
-                      <XAxis dataKey="label" stroke="#71717A" fontSize={10} tickLine={false} />
-                      <YAxis stroke="#71717A" fontSize={10} tickLine={false} allowDecimals={false} />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
+                      <XAxis dataKey="label" stroke={mutedHex} fontSize={11} tickLine={false} />
+                      <YAxis stroke={mutedHex} fontSize={11} tickLine={false} allowDecimals={false} />
                       <Tooltip
-                        contentStyle={{
-                          backgroundColor: "#18181B",
-                          borderColor: "#27272A",
-                          borderRadius: "8px",
-                          fontSize: "11px",
-                          color: "#FFFFFF",
-                        }}
+                        contentStyle={tooltipStyle}
                       />
                       <Line
                         type="monotone"
                         dataKey="currentBookings"
                         name="Dispatches"
-                        stroke="#16865C"
+                        stroke={accentHex}
                         strokeWidth={2.4}
-                        dot={{ r: 3, fill: "#16865C" }}
+                        dot={{ r: 3, fill: accentHex }}
                       />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              <div className="lg:col-span-4 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-4 p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs flex flex-col justify-between">
                 <div>
-                  <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
+                  <h3 className="text-xs font-bold text-[var(--admin-text)]">
                     Pickup vs Handover Verification
                   </h3>
-                  <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
+                  <p className="text-[11px] text-[var(--admin-text-muted)]">
                     Two-party PIN cryptographic verification
                   </p>
                 </div>
@@ -2048,46 +2004,46 @@ export default function Analytics() {
                 <div className="py-4 space-y-3.5 my-auto">
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs">
-                      <span className="text-[#71717A]">Vendor Pickup PIN</span>
-                      <span className="font-mono font-semibold text-[#16865C]">100% Compliant</span>
+                      <span className="text-[var(--admin-text-muted)]">Vendor Pickup PIN</span>
+                      <span className="font-mono font-semibold text-[var(--admin-success)]">100% Compliant</span>
                     </div>
-                    <div className="h-2 w-full bg-[#F4F4F5] dark:bg-[#1E1E1E] rounded-full overflow-hidden">
-                      <div className="h-full bg-[#16865C] rounded-full w-full" />
+                    <div className="h-2 w-full bg-[var(--admin-elevated)] rounded-full overflow-hidden">
+                      <div className="h-full bg-[var(--admin-success)] rounded-full w-full" />
                     </div>
                   </div>
 
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs">
-                      <span className="text-[#71717A]">Renter Handover PIN</span>
-                      <span className="font-mono font-semibold text-[#635BFF]">
+                      <span className="text-[var(--admin-text-muted)]">Renter Handover PIN</span>
+                      <span className="font-mono font-semibold text-[var(--admin-success)]">
                         {dataset?.deliveryMetrics.pinVerificationRate}% Compliant
                       </span>
                     </div>
-                    <div className="h-2 w-full bg-[#F4F4F5] dark:bg-[#1E1E1E] rounded-full overflow-hidden">
+                    <div className="h-2 w-full bg-[var(--admin-elevated)] rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-[#635BFF] rounded-full"
+                        className="h-full bg-[var(--admin-success)] rounded-full"
                         style={{ width: `${dataset?.deliveryMetrics.pinVerificationRate}%` }}
                       />
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-[#E4E4E7] dark:border-[#27272A] text-xs text-[#71717A] flex justify-between">
+                <div className="pt-3 border-t border-[var(--admin-border)] text-xs text-[var(--admin-text-muted)] flex justify-between">
                   <span>Audit Policy</span>
-                  <span className="font-semibold text-[#16865C]">Strict Dual-PIN</span>
+                  <span className="font-semibold text-[var(--admin-success)]">Strict Dual-PIN</span>
                 </div>
               </div>
             </div>
 
             {/* Detailed Dispatch Audit Records Table */}
-            <div className="p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wide text-[#18181B] dark:text-[#FAFAFA]">
+            <div className="p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs space-y-3">
+              <h3 className="text-xs font-bold text-[var(--admin-text)]">
                 Delivery Dispatch Audit Records
               </h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-[#E4E4E7] dark:border-[#27272A] text-[10px] font-mono uppercase text-[#71717A]">
+                    <tr className="border-b border-[var(--admin-border)] text-[11px] font-medium text-[var(--admin-text-muted)]">
                       <th className="py-2 px-2.5">Booking ID</th>
                       <th className="py-2 px-2.5">Gear</th>
                       <th className="py-2 px-2.5">Agent</th>
@@ -2096,22 +2052,22 @@ export default function Analytics() {
                       <th className="py-2 px-2.5 text-center">Renter PIN</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#E4E4E7] dark:divide-[#27272A]">
+                  <tbody className="divide-y divide-[var(--admin-border)]">
                     {dataset?.deliveryMetrics.records.map((d) => (
-                      <tr key={d.id} className="hover:bg-[#F7F7F8] dark:hover:bg-[#1A1F2C]/40">
-                        <td className="py-2.5 px-2.5 font-mono text-[11px] font-medium text-[#635BFF]">{d.bookingId}</td>
+                      <tr key={d.id} className="hover:bg-[var(--admin-elevated)]">
+                        <td className="py-2.5 px-2.5 font-mono text-[11px] font-medium text-[var(--admin-success)]">{d.bookingId}</td>
                         <td className="py-2.5 px-2.5 font-medium">{d.productTitle}</td>
-                        <td className="py-2.5 px-2.5 text-[#71717A]">{d.deliveryAgent}</td>
+                        <td className="py-2.5 px-2.5 text-[var(--admin-text-muted)]">{d.deliveryAgent}</td>
                         <td className="py-2.5 px-2.5">
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-black/5 dark:bg-white/10">
+                          <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[var(--admin-elevated)] text-[var(--admin-text-secondary)] border border-[var(--admin-border)]">
                             {d.deliveryStatus}
                           </span>
                         </td>
-                        <td className="py-2.5 px-2.5 text-center text-[10px] font-semibold text-[#16865C]">
-                          {d.vendorPinVerified ? "✓ Verified" : "Pending"}
+                        <td className="py-2.5 px-2.5 text-center text-[11px] font-semibold text-[var(--admin-success)]">
+                          {d.vendorPinVerified ? "Verified" : "Pending"}
                         </td>
-                        <td className="py-2.5 px-2.5 text-center text-[10px] font-semibold text-[#16865C]">
-                          {d.renterPinVerified ? "✓ Verified" : "Pending"}
+                        <td className="py-2.5 px-2.5 text-center text-[11px] font-semibold text-[var(--admin-success)]">
+                          {d.renterPinVerified ? "Verified" : "Pending"}
                         </td>
                       </tr>
                     ))}
@@ -2130,58 +2086,58 @@ export default function Analytics() {
         {activeTab === "Finance" && (
           <div className="space-y-5">
             {/* Financial Summary Metric Strip */}
-            <div className="rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs overflow-hidden">
-              <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-[#E4E4E7] dark:divide-[#27272A]">
+            <div className="rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs overflow-hidden">
+              <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-[var(--admin-border)]">
                 <div className="p-4">
-                  <span className="text-[11px] font-medium text-[#71717A]">Gross Rental Value</span>
-                  <div className="text-2xl font-bold font-mono mt-1 text-[#18181B] dark:text-[#FAFAFA]">
+                  <span className="text-[11px] font-medium text-[var(--admin-text-muted)]">Gross Rental Value</span>
+                  <div className="text-2xl font-bold font-mono mt-1 text-[var(--admin-text)]">
                     ₹{dataset?.finance.grossRentalValue.toLocaleString("en-IN")}
                   </div>
-                  <span className="text-[10px] text-[#71717A]">Gross rental turnover</span>
+                  <span className="text-[11px] text-[var(--admin-text-muted)]">Gross rental turnover</span>
                 </div>
-                <div className="p-4 bg-[#FAFAFB] dark:bg-[#1E1E1E]">
-                  <span className="text-[11px] font-semibold text-[#635BFF]">Platform Revenue (10%)</span>
-                  <div className="text-2xl font-bold font-mono text-[#635BFF] mt-1">
+                <div className="p-4 bg-[var(--admin-elevated)]">
+                  <span className="text-[11px] font-semibold text-[var(--admin-success)]">Platform Revenue (10%)</span>
+                  <div className="text-2xl font-bold font-mono text-[var(--admin-success)] mt-1">
                     ₹{dataset?.finance.platformRevenue.toLocaleString("en-IN")}
                   </div>
-                  <span className="text-[10px] text-[#71717A]">10% platform take-rate</span>
+                  <span className="text-[11px] text-[var(--admin-text-muted)]">10% platform take-rate</span>
                 </div>
                 <div className="p-4">
-                  <span className="text-[11px] font-medium text-[#16865C]">Payments Collected</span>
-                  <div className="text-2xl font-bold font-mono text-[#16865C] mt-1">
+                  <span className="text-[11px] font-medium text-[var(--admin-success)]">Payments Collected</span>
+                  <div className="text-2xl font-bold font-mono text-[var(--admin-success)] mt-1">
                     ₹{dataset?.finance.paymentsCollected.toLocaleString("en-IN")}
                   </div>
-                  <span className="text-[10px] text-[#71717A]">Realized funds</span>
+                  <span className="text-[11px] text-[var(--admin-text-muted)]">Realized funds</span>
                 </div>
                 <div className="p-4">
-                  <span className="text-[11px] font-medium text-[#DC4545]">Completed Refunds</span>
-                  <div className="text-2xl font-bold font-mono text-[#DC4545] mt-1">
+                  <span className="text-[11px] font-medium text-[var(--admin-error)]">Completed Refunds</span>
+                  <div className="text-2xl font-bold font-mono text-[var(--admin-error)] mt-1">
                     ₹{dataset?.finance.completedRefunds.toLocaleString("en-IN")}
                   </div>
-                  <span className="text-[10px] text-[#71717A]">Settled returns</span>
+                  <span className="text-[11px] text-[var(--admin-text-muted)]">Settled returns</span>
                 </div>
               </div>
             </div>
 
             {/* Asymmetric Workspace: Revenue Trend vs Payment & Settlement Breakdown */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-              <div className="lg:col-span-8 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-8 p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs flex flex-col justify-between">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
+                    <h3 className="text-xs font-bold text-[var(--admin-text)]">
                       Revenue Trend Visualization
                     </h3>
-                    <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
+                    <p className="text-[11px] text-[var(--admin-text-muted)]">
                       Gross turnover vs Net platform commission (10%)
                     </p>
                   </div>
                   <div className="flex items-center gap-3 text-xs">
-                    <span className="flex items-center gap-1.5 text-[11px] text-[#18181B] dark:text-[#FAFAFA]">
-                      <span className="h-2 w-2 rounded-full bg-[#635BFF]" />
+                    <span className="flex items-center gap-1.5 text-[11px] text-[var(--admin-text)]">
+                      <span className="h-2 w-2 rounded-full bg-[var(--admin-success)]" />
                       Gross Turnover
                     </span>
-                    <span className="flex items-center gap-1.5 text-[11px] text-[#16865C]">
-                      <span className="h-2 w-2 rounded-full bg-[#16865C]" />
+                    <span className="flex items-center gap-1.5 text-[11px] text-[var(--admin-success)]">
+                      <span className="h-2 w-2 rounded-full bg-[var(--admin-success)]" />
                       Platform 10%
                     </span>
                   </div>
@@ -2190,29 +2146,23 @@ export default function Analytics() {
                 <div className="h-72 w-full pt-1">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={dataset?.bookingTrend || []}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
-                      <XAxis dataKey="label" stroke="#71717A" fontSize={10} tickLine={false} />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
+                      <XAxis dataKey="label" stroke={mutedHex} fontSize={11} tickLine={false} />
                       <YAxis
-                        stroke="#71717A"
+                        stroke={mutedHex}
                         fontSize={10}
                         tickLine={false}
                         tickFormatter={(v) => `₹${v >= 1000 ? `${v / 1000}k` : v}`}
                       />
                       <Tooltip
-                        contentStyle={{
-                          backgroundColor: "#18181B",
-                          borderColor: "#27272A",
-                          borderRadius: "8px",
-                          fontSize: "11px",
-                          color: "#FFFFFF",
-                        }}
+                        contentStyle={tooltipStyle}
                       />
                       <Area
                         type="monotone"
                         dataKey="currentRevenue"
                         name="Gross"
-                        stroke="#635BFF"
-                        fill="#635BFF"
+                        stroke={accentHex}
+                        fill={accentHex}
                         fillOpacity={0.16}
                       />
                     </AreaChart>
@@ -2220,83 +2170,83 @@ export default function Analytics() {
                 </div>
               </div>
 
-              <div className="lg:col-span-4 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-4 p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs flex flex-col justify-between">
                 <div>
-                  <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
+                  <h3 className="text-xs font-bold text-[var(--admin-text)]">
                     Payment & Settlement Breakdown
                   </h3>
-                  <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
+                  <p className="text-[11px] text-[var(--admin-text-muted)]">
                     Settlement status distribution
                   </p>
                 </div>
 
                 <div className="space-y-3.5 my-auto py-3">
-                  <div className="p-3 rounded-lg bg-[#F7F7F8] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between">
+                  <div className="p-3 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] flex items-center justify-between">
                     <div>
-                      <span className="font-semibold text-xs block text-[#18181B] dark:text-[#FAFAFA]">
+                      <span className="font-semibold text-xs block text-[var(--admin-text)]">
                         Vendor Settlements (90%)
                       </span>
-                      <span className="text-[10px] text-[#71717A]">Payable to equipment owners</span>
+                      <span className="text-[11px] text-[var(--admin-text-muted)]">Payable to equipment owners</span>
                     </div>
-                    <span className="font-mono text-sm font-bold text-[#16865C]">
+                    <span className="font-mono text-sm font-bold text-[var(--admin-success)]">
                       ₹{Math.round((dataset?.finance.grossRentalValue || 0) * 0.9).toLocaleString("en-IN")}
                     </span>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-[#F7F7F8] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between">
+                  <div className="p-3 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] flex items-center justify-between">
                     <div>
-                      <span className="font-semibold text-xs block text-[#18181B] dark:text-[#FAFAFA]">
+                      <span className="font-semibold text-xs block text-[var(--admin-text)]">
                         Platform Retained (10%)
                       </span>
-                      <span className="text-[10px] text-[#71717A]">Net earned marketplace commission</span>
+                      <span className="text-[11px] text-[var(--admin-text-muted)]">Net earned marketplace commission</span>
                     </div>
-                    <span className="font-mono text-sm font-bold text-[#635BFF]">
+                    <span className="font-mono text-sm font-bold text-[var(--admin-success)]">
                       ₹{dataset?.finance.platformRevenue.toLocaleString("en-IN")}
                     </span>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-[#F7F7F8] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between">
+                  <div className="p-3 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] flex items-center justify-between">
                     <div>
-                      <span className="font-semibold text-xs block text-[#18181B] dark:text-[#FAFAFA]">
+                      <span className="font-semibold text-xs block text-[var(--admin-text)]">
                         Refund Escrow
                       </span>
-                      <span className="text-[10px] text-[#71717A]">Disputed or returned payments</span>
+                      <span className="text-[11px] text-[var(--admin-text-muted)]">Disputed or returned payments</span>
                     </div>
-                    <span className="font-mono text-sm font-bold text-[#DC4545]">
+                    <span className="font-mono text-sm font-bold text-[var(--admin-error)]">
                       ₹{dataset?.finance.completedRefunds.toLocaleString("en-IN")}
                     </span>
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-[#E4E4E7] dark:border-[#27272A] text-xs text-[#71717A] flex justify-between">
+                <div className="pt-3 border-t border-[var(--admin-border)] text-xs text-[var(--admin-text-muted)] flex justify-between">
                   <span>Reconciliation Rate</span>
-                  <span className="font-semibold text-[#16865C]">100% Balanced</span>
+                  <span className="font-semibold text-[var(--admin-success)]">100% Balanced</span>
                 </div>
               </div>
             </div>
 
             {/* Read-Only Financial Reconciliation Table */}
-            <div className="p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3">
+            <div className="p-5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-xs font-bold uppercase tracking-wide text-[#18181B] dark:text-[#FAFAFA]">
+                  <h3 className="text-xs font-bold text-[var(--admin-text)]">
                     Financial Reconciliation Ledger (Read-Only)
                   </h3>
-                  <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
+                  <p className="text-[11px] text-[var(--admin-text-muted)]">
                     10% Platform fee calculation, 90% vendor payout allocation, and reconciliation status
                   </p>
                 </div>
                 <div className="relative">
-                  <Search className="h-3 w-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#71717A]" />
+                  <Search className="h-3 w-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--admin-text-muted)]" />
                   <input
                     type="text"
-                    placeholder="Search reconciliation..."
+                    placeholder="Search reconciliation"
                     value={reconciliationSearch}
                     onChange={(e) => {
                       setReconciliationSearch(e.target.value);
                       setReconciliationPage(1);
                     }}
-                    className="pl-7 pr-2.5 py-1 rounded-md bg-[#F4F4F5] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] text-xs w-48"
+                    className="pl-7 pr-2.5 py-1 rounded-md bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-xs w-48"
                   />
                 </div>
               </div>
@@ -2304,7 +2254,7 @@ export default function Analytics() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-[#E4E4E7] dark:border-[#27272A] text-[10px] font-mono uppercase text-[#71717A]">
+                    <tr className="border-b border-[var(--admin-border)] text-[11px] font-medium text-[var(--admin-text-muted)]">
                       <th className="py-2 px-2.5">Booking ID</th>
                       <th className="py-2 px-2.5">Customer</th>
                       <th className="py-2 px-2.5 text-right">Gross Amount</th>
@@ -2314,26 +2264,26 @@ export default function Analytics() {
                       <th className="py-2 px-2.5 text-center">Reconciliation</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#E4E4E7] dark:divide-[#27272A]">
+                  <tbody className="divide-y divide-[var(--admin-border)]">
                     {paginatedReconciliation.map((r) => (
-                      <tr key={r.id} className="hover:bg-[#F7F7F8] dark:hover:bg-[#1A1F2C]/40">
-                        <td className="py-2.5 px-2.5 font-mono text-[11px] font-medium text-[#635BFF]">{r.bookingId}</td>
-                        <td className="py-2.5 px-2.5 text-[#71717A]">{r.customerName}</td>
+                      <tr key={r.id} className="hover:bg-[var(--admin-elevated)]">
+                        <td className="py-2.5 px-2.5 font-mono text-[11px] font-medium text-[var(--admin-success)]">{r.bookingId}</td>
+                        <td className="py-2.5 px-2.5 text-[var(--admin-text-muted)]">{r.customerName}</td>
                         <td className="py-2.5 px-2.5 text-right font-mono font-medium">₹{r.grossAmount.toLocaleString("en-IN")}</td>
-                        <td className="py-2.5 px-2.5 text-right font-mono font-medium text-[#635BFF]">₹{r.platformFee.toLocaleString("en-IN")}</td>
-                        <td className="py-2.5 px-2.5 text-right font-mono text-[#71717A]">₹{r.vendorPayout.toLocaleString("en-IN")}</td>
-                        <td className="py-2.5 px-2.5 text-center font-mono text-[10px] capitalize text-[#71717A]">{r.paymentStatus}</td>
+                        <td className="py-2.5 px-2.5 text-right font-mono font-medium text-[var(--admin-success)]">₹{r.platformFee.toLocaleString("en-IN")}</td>
+                        <td className="py-2.5 px-2.5 text-right font-mono text-[var(--admin-text-muted)]">₹{r.vendorPayout.toLocaleString("en-IN")}</td>
+                        <td className="py-2.5 px-2.5 text-center font-mono text-[11px] capitalize text-[var(--admin-text-muted)]">{r.paymentStatus}</td>
                         <td className="py-2.5 px-2.5 text-center">
                           <span
                             className={cn(
-                              "px-2 py-0.5 rounded text-[10px] font-medium",
+                              "px-2 py-0.5 rounded text-[11px] font-medium",
                               r.reconciliationStatus === "Reconciled"
-                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/50"
+                                ? "bg-emerald-500/10 text-[var(--admin-success)] border border-[var(--admin-success)]/20"
                                 : r.reconciliationStatus === "Settlement Due"
-                                ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/50"
+                                ? "bg-[var(--admin-elevated)] text-[var(--admin-text-secondary)] border border-[var(--admin-border)]"
                                 : r.reconciliationStatus === "Refunded"
-                                ? "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200/50"
-                                : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200/50"
+                                ? "bg-[var(--admin-elevated)] text-[var(--admin-text)] border border-[var(--admin-border)]"
+                                : "bg-amber-500/10 text-[var(--admin-warning)] border border-[var(--admin-warning)]/20"
                             )}
                           >
                             {r.reconciliationStatus}

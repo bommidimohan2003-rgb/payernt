@@ -117,19 +117,16 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background hero-gradient relative overflow-hidden px-4">
-      {/* Decorative Blur Orbs */}
-      <div className="absolute top-1/4 left-1/4 h-72 w-72 bg-primary/20 rounded-full blur-[100px]" />
-      <div className="absolute bottom-1/4 right-1/4 h-80 w-80 bg-accent/20 rounded-full blur-[110px]" />
+    <div className="min-h-screen flex items-center justify-center bg-[var(--admin-bg)] relative px-4 py-8">
 
       <motion.div
-        initial={{ opacity: 0, y: 30 }}
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ type: "spring", stiffness: 100, damping: 15 }}
+        transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
         className="w-full max-w-md z-10"
       >
         {/* Card */}
-        <div className="glass bg-card/65 rounded-3xl p-8 shadow-2xl border border-border/80 relative space-y-6">
+        <div className="bg-[var(--admin-card)] rounded-2xl p-6 sm:p-8 shadow-sm border border-[var(--admin-border)] relative space-y-6">
           {/* Logo & Header */}
           <div className="flex flex-col items-center text-center">
             <div className="flex items-center justify-center w-14 h-14 mb-3 select-none">
@@ -141,33 +138,33 @@ export default function Login() {
                 height={56}
               />
             </div>
-            <span className="font-sans font-black tracking-tight text-3xl text-foreground mb-2">
-              PAYENT
+            <span className="font-sans font-semibold tracking-tight text-2xl text-[var(--admin-text)] mb-2">
+              Payent
             </span>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-primary px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 mb-3">
-              Admin Portal
+            <span className="text-[11px] font-medium text-[var(--admin-text-muted)] px-2.5 py-0.5 rounded-full bg-[var(--admin-elevated)] border border-[var(--admin-border)] mb-3">
+              Admin portal
             </span>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground font-display">
-              {mode === "login" ? "Welcome Back" : "Register Admin Account"}
+            <h1 className="text-xl font-semibold tracking-tight text-[var(--admin-text)]">
+              {mode === "login" ? "Admin sign in" : "Register admin account"}
             </h1>
-            <p className="text-xs font-semibold text-muted-foreground mt-1.5">
+            <p className="text-xs font-semibold text-[var(--admin-text-muted)] mt-1.5">
               {mode === "login"
                 ? "Access the Payent Admin Control Panel"
                 : "Create or promote an administrator account for Payent"}
             </p>
 
             {/* Mode Switcher Tabs */}
-            <div className="flex w-full bg-secondary/60 p-1 rounded-2xl mt-5 border border-border/60">
+            <div className="flex w-full bg-[var(--admin-elevated)] p-1 rounded-2xl mt-5 border border-[var(--admin-border)]">
               <button
                 type="button"
                 onClick={() => {
                   setMode("login");
                   setServerError(null);
                 }}
-                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-colors cursor-pointer ${
                   mode === "login"
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "bg-[var(--admin-card)] text-[var(--admin-text)] shadow-sm"
+                    : "text-[var(--admin-text-muted)] hover:text-[var(--admin-text)]"
                 }`}
               >
                 Sign In
@@ -178,10 +175,10 @@ export default function Login() {
                   setMode("register");
                   setServerError(null);
                 }}
-                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-colors cursor-pointer ${
                   mode === "register"
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "bg-[var(--admin-card)] text-[var(--admin-text)] shadow-sm"
+                    : "text-[var(--admin-text-muted)] hover:text-[var(--admin-text)]"
                 }`}
               >
                 Register Admin
@@ -202,20 +199,20 @@ export default function Login() {
               className="space-y-4"
             >
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-muted-foreground tracking-wide">
+                <label className="text-xs font-medium text-[var(--admin-text-secondary)]">
                   Email Address
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
+                  <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-[var(--admin-text-muted)]" />
                   <input
                     type="email"
                     placeholder="admin@payent.in"
                     {...loginForm.register("email")}
-                    className="w-full bg-secondary/50 text-foreground text-xs rounded-xl pl-10 pr-4 py-3.5 border border-border/80 focus:outline-none focus:border-primary focus:bg-card focus:ring-1 focus:ring-primary transition-all placeholder:text-muted-foreground/60"
+                    className="w-full bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-xl pl-10 pr-4 py-3.5 border border-[var(--admin-border)] focus:outline-none focus:border-[var(--admin-text)] focus:bg-[var(--admin-card)] focus:ring-1 focus:ring-[var(--admin-text)]/20 transition-colors placeholder:text-[var(--admin-text-muted)]"
                   />
                 </div>
                 {loginForm.formState.errors.email && (
-                  <p className="text-[10px] font-bold text-destructive pl-1">
+                  <p className="text-[11px] font-bold text-destructive pl-1">
                     {loginForm.formState.errors.email.message}
                   </p>
                 )}
@@ -223,7 +220,7 @@ export default function Login() {
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-muted-foreground tracking-wide">
+                  <label className="text-xs font-medium text-[var(--admin-text-secondary)]">
                     Password
                   </label>
                   <a
@@ -232,23 +229,23 @@ export default function Login() {
                       e.preventDefault();
                       navigate({ to: "/forgot-password", search: { token: "" } as any });
                     }}
-                    className="text-xs font-bold text-primary hover:underline cursor-pointer"
+                    className="text-xs font-bold text-[var(--admin-success)] hover:underline cursor-pointer"
                   >
                     Forgot Password?
                   </a>
                 </div>
                 <div className="relative">
-                  <Lock className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
+                  <Lock className="absolute left-3.5 top-3.5 h-4 w-4 text-[var(--admin-text-muted)]" />
                   <input
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     {...loginForm.register("password")}
-                    className="w-full bg-secondary/50 text-foreground text-xs rounded-xl pl-10 pr-10 py-3.5 border border-border/80 focus:outline-none focus:border-primary focus:bg-card focus:ring-1 focus:ring-primary transition-all placeholder:text-muted-foreground/60"
+                    className="w-full bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-xl pl-10 pr-10 py-3.5 border border-[var(--admin-border)] focus:outline-none focus:border-[var(--admin-text)] focus:bg-[var(--admin-card)] focus:ring-1 focus:ring-[var(--admin-text)]/20 transition-colors placeholder:text-[var(--admin-text-muted)]"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-3.5 text-muted-foreground hover:text-foreground cursor-pointer"
+                    className="absolute right-3.5 top-3.5 text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] cursor-pointer"
                   >
                     {showPassword ? (
                       <EyeOff className="h-4.5 w-4.5" />
@@ -258,7 +255,7 @@ export default function Login() {
                   </button>
                 </div>
                 {loginForm.formState.errors.password && (
-                  <p className="text-[10px] font-bold text-destructive pl-1">
+                  <p className="text-[11px] font-bold text-destructive pl-1">
                     {loginForm.formState.errors.password.message}
                   </p>
                 )}
@@ -267,7 +264,7 @@ export default function Login() {
               <div className="flex items-center">
                 <label
                   htmlFor="rememberMe"
-                  className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none group"
+                  className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] transition-colors cursor-pointer select-none group"
                 >
                   <input
                     id="rememberMe"
@@ -283,7 +280,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 bg-black dark:bg-white text-white dark:text-black hover:bg-neutral-800 dark:hover:bg-neutral-200 font-bold py-3.5 px-4 rounded-xl text-xs mt-3 transition-all shadow-md cursor-pointer disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 bg-[var(--admin-accent)] text-[var(--admin-bg)] hover:bg-[var(--admin-accent-hover)] font-bold py-3.5 px-4 rounded-xl text-xs mt-3 transition-colors shadow-md cursor-pointer disabled:opacity-50"
               >
                 {loading ? (
                   <>
@@ -299,7 +296,7 @@ export default function Login() {
               </button>
 
               {/* Quick Demo Sign-in Option */}
-              <div className="pt-2 border-t border-border/40">
+              <div className="pt-2 border-t border-[var(--admin-border)]">
                 <button
                   type="button"
                   onClick={() => {
@@ -323,7 +320,7 @@ export default function Login() {
                     toast.success("Signed in as Administrator (Bommidi Mohan)");
                     navigate({ to: "/admin/dashboard" });
                   }}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 dark:text-blue-400 text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-98"
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-[var(--admin-border)] bg-[var(--admin-elevated)] hover:opacity-85 text-[var(--admin-text)] text-xs font-medium transition-colors cursor-pointer"
                 >
                   <ShieldCheck className="h-4 w-4" />
                   <span>Sign In as Administrator (Bommidi Mohan)</span>
@@ -339,61 +336,61 @@ export default function Login() {
               className="space-y-4"
             >
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-muted-foreground tracking-wide">
+                <label className="text-xs font-medium text-[var(--admin-text-secondary)]">
                   Full Name
                 </label>
                 <div className="relative">
-                  <User className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
+                  <User className="absolute left-3.5 top-3.5 h-4 w-4 text-[var(--admin-text-muted)]" />
                   <input
                     type="text"
                     placeholder="Your full name"
                     {...registerForm.register("fullName")}
-                    className="w-full bg-secondary/50 text-foreground text-xs rounded-xl pl-10 pr-4 py-3.5 border border-border/80 focus:outline-none focus:border-primary focus:bg-card focus:ring-1 focus:ring-primary transition-all placeholder:text-muted-foreground/60"
+                    className="w-full bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-xl pl-10 pr-4 py-3.5 border border-[var(--admin-border)] focus:outline-none focus:border-[var(--admin-text)] focus:bg-[var(--admin-card)] focus:ring-1 focus:ring-[var(--admin-text)]/20 transition-colors placeholder:text-[var(--admin-text-muted)]"
                   />
                 </div>
                 {registerForm.formState.errors.fullName && (
-                  <p className="text-[10px] font-bold text-destructive pl-1">
+                  <p className="text-[11px] font-bold text-destructive pl-1">
                     {registerForm.formState.errors.fullName.message}
                   </p>
                 )}
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-muted-foreground tracking-wide">
+                <label className="text-xs font-medium text-[var(--admin-text-secondary)]">
                   Admin Email Address
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
+                  <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-[var(--admin-text-muted)]" />
                   <input
                     type="email"
                     placeholder="admin@payent.in"
                     {...registerForm.register("email")}
-                    className="w-full bg-secondary/50 text-foreground text-xs rounded-xl pl-10 pr-4 py-3.5 border border-border/80 focus:outline-none focus:border-primary focus:bg-card focus:ring-1 focus:ring-primary transition-all placeholder:text-muted-foreground/60"
+                    className="w-full bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-xl pl-10 pr-4 py-3.5 border border-[var(--admin-border)] focus:outline-none focus:border-[var(--admin-text)] focus:bg-[var(--admin-card)] focus:ring-1 focus:ring-[var(--admin-text)]/20 transition-colors placeholder:text-[var(--admin-text-muted)]"
                   />
                 </div>
                 {registerForm.formState.errors.email && (
-                  <p className="text-[10px] font-bold text-destructive pl-1">
+                  <p className="text-[11px] font-bold text-destructive pl-1">
                     {registerForm.formState.errors.email.message}
                   </p>
                 )}
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-muted-foreground tracking-wide">
+                <label className="text-xs font-medium text-[var(--admin-text-secondary)]">
                   Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
+                  <Lock className="absolute left-3.5 top-3.5 h-4 w-4 text-[var(--admin-text-muted)]" />
                   <input
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     {...registerForm.register("password")}
-                    className="w-full bg-secondary/50 text-foreground text-xs rounded-xl pl-10 pr-10 py-3.5 border border-border/80 focus:outline-none focus:border-primary focus:bg-card focus:ring-1 focus:ring-primary transition-all placeholder:text-muted-foreground/60"
+                    className="w-full bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-xl pl-10 pr-10 py-3.5 border border-[var(--admin-border)] focus:outline-none focus:border-[var(--admin-text)] focus:bg-[var(--admin-card)] focus:ring-1 focus:ring-[var(--admin-text)]/20 transition-colors placeholder:text-[var(--admin-text-muted)]"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-3.5 text-muted-foreground hover:text-foreground cursor-pointer"
+                    className="absolute right-3.5 top-3.5 text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] cursor-pointer"
                   >
                     {showPassword ? (
                       <EyeOff className="h-4.5 w-4.5" />
@@ -403,41 +400,41 @@ export default function Login() {
                   </button>
                 </div>
                 {registerForm.formState.errors.password && (
-                  <p className="text-[10px] font-bold text-destructive pl-1">
+                  <p className="text-[11px] font-bold text-destructive pl-1">
                     {registerForm.formState.errors.password.message}
                   </p>
                 )}
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-muted-foreground tracking-wide flex items-center justify-between">
+                <label className="text-xs font-medium text-[var(--admin-text-secondary)] flex items-center justify-between">
                   <span>Admin Security Code</span>
-                  <span className="text-[10px] font-normal text-muted-foreground/80">
+                  <span className="text-[11px] font-normal text-[var(--admin-text-muted)]">
                     Default: PAYENT-ADMIN-2026
                   </span>
                 </label>
                 <div className="relative">
-                  <KeyRound className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
+                  <KeyRound className="absolute left-3.5 top-3.5 h-4 w-4 text-[var(--admin-text-muted)]" />
                   <input
                     type="text"
                     placeholder="PAYENT-ADMIN-2026"
                     {...registerForm.register("adminCode")}
-                    className="w-full bg-secondary/50 text-foreground text-xs rounded-xl pl-10 pr-4 py-3.5 border border-border/80 focus:outline-none focus:border-primary focus:bg-card focus:ring-1 focus:ring-primary transition-all placeholder:text-muted-foreground/60 font-mono"
+                    className="w-full bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-xl pl-10 pr-4 py-3.5 border border-[var(--admin-border)] focus:outline-none focus:border-[var(--admin-text)] focus:bg-[var(--admin-card)] focus:ring-1 focus:ring-[var(--admin-text)]/20 transition-colors placeholder:text-[var(--admin-text-muted)] font-mono"
                   />
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-secondary/80 border border-border flex flex-col gap-2">
-                <label className="flex items-center gap-2 text-xs font-bold cursor-pointer text-foreground select-none">
+              <div className="p-3 rounded-xl bg-secondary/80 border border-[var(--admin-border)] flex flex-col gap-2">
+                <label className="flex items-center gap-2 text-xs font-bold cursor-pointer text-[var(--admin-text)] select-none">
                   <input
                     type="checkbox"
                     defaultChecked={true}
-                    className="rounded border-border text-primary focus:ring-primary h-4 w-4 accent-primary"
+                    className="rounded border-[var(--admin-border)] text-[var(--admin-success)] focus:ring-[var(--admin-text)]/20 h-4 w-4 accent-primary"
                   />
-                  <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
+                  <ShieldCheck className="h-4 w-4 text-[var(--admin-success)] shrink-0" />
                   <span>Register as site administrator</span>
                 </label>
-                <p className="text-[10px] text-muted-foreground pl-6">
+                <p className="text-[11px] text-[var(--admin-text-muted)] pl-6">
                   Grants full administrative privileges over listings, users,
                   orders, and platform analytics.
                 </p>
@@ -446,7 +443,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground hover:opacity-90 font-bold py-3.5 px-4 rounded-xl text-xs mt-3 transition-all shadow-md cursor-pointer disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 bg-[var(--admin-accent)] text-[var(--admin-bg)] hover:opacity-90 font-bold py-3.5 px-4 rounded-xl text-xs mt-3 transition-colors shadow-md cursor-pointer disabled:opacity-50"
               >
                 {loading ? (
                   <>

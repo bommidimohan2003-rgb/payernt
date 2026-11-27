@@ -28,6 +28,8 @@ import { Pagination } from "../components/layout/Pagination";
 import { usersService, isFakeUserEmail } from "../services/users";
 import { AdminUser } from "../services/api";
 import { Loader } from "../components/layout/Loader";
+import { Modal } from "../components/layout/Modal";
+import { ConfirmDialog } from "../components/layout/ConfirmDialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { adminWS } from "../services/websocket";
@@ -155,6 +157,7 @@ export default function Users() {
   // User actions & rejection modal
   const [rejectModalTarget, setRejectModalTarget] = useState<{ id: string; name: string; type?: string } | null>(null);
   const [rejectReasonInput, setRejectReasonInput] = useState("");
+  const [suspendTargetId, setSuspendTargetId] = useState<string | null>(null);
 
   const handleApprove = async (id: string, type?: string) => {
     try {
@@ -234,8 +237,13 @@ export default function Users() {
     }
   };
 
-  const handleSuspend = async (id: string) => {
-    if (!confirm("Are you sure you want to suspend this user? They will be barred from creating bookings or listings.")) return;
+  const handleSuspend = (id: string) => {
+    setSuspendTargetId(id);
+  };
+
+  const executeSuspend = async () => {
+    if (!suspendTargetId) return;
+    const id = suspendTargetId;
     try {
       setActionLoading(true);
       const updated = await usersService.suspendUser(id);
@@ -244,6 +252,7 @@ export default function Users() {
         setSelectedUser((prev) => prev ? { ...prev, ...updated, status: "suspended" } : null);
       }
       toast.warning("User suspended.");
+      setSuspendTargetId(null);
     } catch {
       toast.error("Failed to suspend user.");
     } finally {
@@ -359,8 +368,8 @@ export default function Users() {
             shape="circle"
           />
           <div className="min-w-0">
-            <div className="font-bold text-foreground truncate">{row.fullName || "User"}</div>
-            <div className="text-[11px] text-muted-foreground font-mono truncate">{row.email}</div>
+            <div className="font-bold text-[var(--admin-text)] truncate">{row.fullName || "User"}</div>
+            <div className="text-[11px] text-[var(--admin-text-muted)] font-mono truncate">{row.email}</div>
           </div>
         </div>
       ),
@@ -372,14 +381,14 @@ export default function Users() {
       render: (row) => (
         <span
           className={cn(
-            "px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider border inline-flex items-center gap-1",
+            "px-2.5 py-0.5 rounded text-[11px] font-mono font-bold  border inline-flex items-center gap-1",
             row.role === "admin"
-              ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20"
+              ? "bg-[var(--admin-elevated)] text-[var(--admin-text)] border-[var(--admin-border)]"
               : row.role === "both"
               ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
               : row.role === "agent"
-              ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
-              : "bg-secondary text-muted-foreground border-border/60"
+              ? "bg-[var(--admin-elevated)] text-[var(--admin-text-secondary)] border-[var(--admin-border)]"
+              : "bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] border-[var(--admin-border)]"
           )}
         >
           {row.accountType || row.role || "Standard"}
@@ -400,17 +409,17 @@ export default function Users() {
         return (
           <span
             className={cn(
-              "px-2 py-0.5 rounded text-[10px] font-mono font-medium uppercase tracking-wider border inline-flex items-center gap-1",
+              "px-2 py-0.5 rounded text-[11px] font-mono font-medium  border inline-flex items-center gap-1",
               isApproved
                 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                 : isPending
                 ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
                 : isSuspended || isRejected
-                ? "bg-red-500/10 text-[#FF1744] border-red-500/20"
-                : "bg-secondary text-muted-foreground border-border/60"
+                ? "bg-red-500/10 text-[var(--admin-error)] border-red-500/20"
+                : "bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] border-[var(--admin-border)]"
             )}
           >
-            <span className={cn("h-1.5 w-1.5 rounded-full", isPending ? "bg-amber-500 animate-pulse" : "bg-current")} />
+            <span className={cn("h-1.5 w-1.5 rounded-full", isPending ? "bg-amber-500 " : "bg-current")} />
             {isPending ? "Pending Review" : (row.status || "active")}
           </span>
         );
@@ -420,7 +429,7 @@ export default function Users() {
       key: "phone",
       label: "Contact",
       render: (row) => (
-        <span className="text-xs font-mono text-muted-foreground">
+        <span className="text-xs font-mono text-[var(--admin-text-muted)]">
           {row.phone || "—"}
         </span>
       ),
@@ -430,7 +439,7 @@ export default function Users() {
       label: "Registered",
       sortable: true,
       render: (row) => (
-        <span className="text-xs text-muted-foreground font-mono">
+        <span className="text-xs text-[var(--admin-text-muted)] font-mono">
           {row.createdAt ? new Date(row.createdAt).toLocaleDateString() : "—"}
         </span>
       ),
@@ -450,7 +459,7 @@ export default function Users() {
           <div className="flex items-center justify-end gap-1.5">
             <button
               onClick={() => handleOpenUser(row)}
-              className="p-1.5 rounded-md hover:bg-secondary text-foreground transition-colors cursor-pointer"
+              className="p-1.5 rounded-md hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] transition-colors cursor-pointer"
               title="Inspect complete user record"
             >
               <Eye className="h-3.5 w-3.5" />
@@ -475,7 +484,7 @@ export default function Users() {
                     })
                   }
                   disabled={actionLoading}
-                  className="p-1.5 rounded-md bg-red-500/10 text-[#FF1744] hover:bg-red-500/20 border border-red-500/20 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-md bg-red-500/10 text-[var(--admin-error)] hover:bg-red-500/20 border border-red-500/20 transition-colors cursor-pointer"
                   title={`Reject ${typeLabel} user`}
                 >
                   <XCircle className="h-3.5 w-3.5" />
@@ -497,7 +506,7 @@ export default function Users() {
                 <button
                   onClick={() => handleSuspend(row.id || row.email)}
                   disabled={actionLoading}
-                  className="p-1.5 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-[#FF1744] transition-colors cursor-pointer"
+                  className="p-1.5 rounded-md hover:bg-red-500/10 text-[var(--admin-text-muted)] hover:text-[var(--admin-error)] transition-colors cursor-pointer"
                   title="Suspend user"
                 >
                   <ShieldAlert className="h-3.5 w-3.5" />
@@ -522,12 +531,12 @@ export default function Users() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-8">
       {/* HEADER (Panel 3) */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[rgba(161,161,170,0.18)] pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[var(--admin-border)] pb-5">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#F5F5F5]">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--admin-text)]">
             Users
           </h1>
-          <p className="text-xs sm:text-sm text-[#A1A1AA]">
+          <p className="text-xs sm:text-sm text-[var(--admin-text-muted)]">
             Manage all Payent and Payrent users and review account approvals.
           </p>
         </div>
@@ -536,7 +545,7 @@ export default function Users() {
           <button
             onClick={() => fetchUsers()}
             disabled={loading}
-            className="p-2 rounded-lg bg-[#10151B] border border-[rgba(161,161,170,0.18)] text-[#A1A1AA] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+            className="p-2 rounded-lg bg-[var(--admin-card)] border border-[var(--admin-border)] text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] transition-colors cursor-pointer"
             title="Refresh user directory"
           >
             <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
@@ -545,7 +554,7 @@ export default function Users() {
       </div>
 
       {/* TABS (Panel 3: All Users, Account Approvals, Verified, Suspended) */}
-      <div className="flex items-center gap-2 border-b border-[rgba(161,161,170,0.18)] pb-2 overflow-x-auto no-scrollbar">
+      <div className="flex items-center gap-2 border-b border-[var(--admin-border)] pb-2 overflow-x-auto no-scrollbar">
         {[
           { id: "all", label: "All Users", count: totalAllCount },
           { id: "pending", label: "Account Approvals", count: pendingCount, isApproval: true },
@@ -556,24 +565,24 @@ export default function Users() {
             key={tab.id}
             onClick={() => handleStatusFilterChange(tab.id)}
             className={cn(
-              "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2",
+              "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap flex items-center gap-2",
               statusFilter === tab.id
-                ? "bg-white text-black font-bold shadow-xs"
-                : "text-[#A1A1AA] hover:text-[#F5F5F5] hover:bg-white/5"
+                ? "bg-[var(--admin-accent)] text-[var(--admin-bg)] font-semibold shadow-xs"
+                : "text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-elevated)]"
             )}
           >
             {tab.isApproval && pendingCount > 0 && (
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
             )}
             <span>{tab.label}</span>
             <span
               className={cn(
-                "px-1.5 py-0.5 rounded-full text-[10px] font-mono",
+                "px-1.5 py-0.5 rounded-full text-[11px] font-mono",
                 tab.isApproval && pendingCount > 0
                   ? "bg-amber-500/20 text-amber-500 font-bold border border-amber-500/30"
                   : statusFilter === tab.id
-                  ? "bg-black/15 text-black"
-                  : "bg-white/10 text-zinc-300"
+                  ? "bg-white/20 dark:bg-black/15 text-[var(--admin-bg)]"
+                  : "bg-[var(--admin-elevated)] text-[var(--admin-text-muted)]"
               )}
             >
               {tab.count.toLocaleString()}
@@ -582,20 +591,20 @@ export default function Users() {
         ))}
       </div>
 
-      {/* CONTROLS ROW (Search, Role filter, Status filter, + Add User) */}
+      {/* CONTROLS ROW (Search, Role filter, Status filter) */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         {/* Search Input */}
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--admin-text-muted)]" />
           <input
             type="text"
-            placeholder="Search by name, email, phone, Aadhaar/PAN..."
+            placeholder="Search by name, email, phone, or ID"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full bg-[#050709] text-[#F5F5F5] text-xs rounded-lg pl-9 pr-3 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none focus:border-white/40 font-medium placeholder:text-zinc-500"
+            className="w-full bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-lg pl-9 pr-3 py-2 border border-[var(--admin-border)] focus:outline-none focus:border-[var(--admin-text)]/40 font-medium placeholder:text-[var(--admin-text-muted)]"
           />
         </div>
 
@@ -608,7 +617,7 @@ export default function Users() {
               setPlatformTab(e.target.value as any);
               setCurrentPage(1);
             }}
-            className="px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-xs text-[#F5F5F5] focus:outline-none cursor-pointer"
+            className="px-3 py-2 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-xs text-[var(--admin-text)] focus:outline-none cursor-pointer"
           >
             <option value="all">All Roles</option>
             <option value="payernt">Lenders / Vendors</option>
@@ -619,7 +628,7 @@ export default function Users() {
           <select
             value={statusFilter}
             onChange={(e) => handleStatusFilterChange(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-xs text-[#F5F5F5] focus:outline-none cursor-pointer"
+            className="px-3 py-2 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-xs text-[var(--admin-text)] focus:outline-none cursor-pointer"
           >
             <option value="all">All Status</option>
             <option value="pending">Account Approvals (Pending)</option>
@@ -627,30 +636,24 @@ export default function Users() {
             <option value="suspended">Suspended</option>
           </select>
 
-          {/* Add User Button */}
-          <button
-            onClick={() => toast.info("Add user action requires user invitation or admin registration.")}
-            className="px-3.5 py-2 rounded-lg bg-white text-black hover:bg-zinc-200 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
-          >
-            <span>+ Add User</span>
-          </button>
+
         </div>
       </div>
 
       {/* ERROR vs TABLE CONTAINER */}
       {error ? (
-        <div className="bg-card border border-red-500/20 p-8 rounded-xl text-center space-y-3">
-          <div className="inline-flex p-2.5 rounded-full bg-red-500/10 text-[#FF1744]">
+        <div className="bg-[var(--admin-card)] border border-red-500/20 p-8 rounded-xl text-center space-y-3">
+          <div className="inline-flex p-2.5 rounded-full bg-red-500/10 text-[var(--admin-error)]">
             <ShieldAlert className="h-6 w-6" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-foreground">Unable to Load Users</h3>
-            <p className="text-xs text-muted-foreground mt-1">{error}</p>
+            <h3 className="text-sm font-bold text-[var(--admin-text)]">Unable to Load Users</h3>
+            <p className="text-xs text-[var(--admin-text-muted)] mt-1">{error}</p>
           </div>
           <div>
             <button
               onClick={() => fetchUsers()}
-              className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:opacity-90 transition-all cursor-pointer shadow-xs inline-flex items-center gap-1.5"
+              className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:opacity-90 transition-colors cursor-pointer shadow-xs inline-flex items-center gap-1.5"
             >
               <RefreshCw className="h-3.5 w-3.5" />
               <span>Retry Database Fetch</span>
@@ -658,7 +661,7 @@ export default function Users() {
           </div>
         </div>
       ) : (
-        <div className="bg-card rounded-2xl border border-border/80 shadow-xs overflow-hidden">
+        <div className="bg-[var(--admin-card)] rounded-2xl border border-[var(--admin-border)] shadow-xs overflow-hidden">
           <Table
             columns={columns}
             data={paginatedUsers}
@@ -671,7 +674,7 @@ export default function Users() {
           />
 
           {filteredUsers.length > itemsPerPage && !loading && (
-            <div className="p-4 border-t border-border/40">
+            <div className="p-4 border-t border-[var(--admin-border)]">
               <Pagination
                 currentPage={currentPage}
                 onPageChange={setCurrentPage}
@@ -685,10 +688,10 @@ export default function Users() {
 
       {/* USER DETAIL SLIDE-OUT DRAWER */}
       {drawerOpen && selectedUser && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-background/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="w-full max-w-xl bg-card border-l border-border/80 shadow-2xl h-full flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/50 animate-in fade-in duration-200">
+          <div className="w-full max-w-xl bg-[var(--admin-card)] border-l border-[var(--admin-border)] shadow-2xl h-full flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
             {/* Drawer Header */}
-            <div className="p-5 border-b border-border/60 flex items-center justify-between bg-secondary/30">
+            <div className="p-5 border-b border-[var(--admin-border)] flex items-center justify-between bg-[var(--admin-elevated)]">
               <div className="flex items-center gap-3">
                 <ProfilePhoto
                   src={selectedUser.profilePhotoUrl || (selectedUser as any).profile_photo_url || selectedUser.avatar}
@@ -697,10 +700,10 @@ export default function Users() {
                   shape="circle"
                 />
                 <div className="min-w-0">
-                  <h3 className="text-sm font-bold text-foreground truncate">
+                  <h3 className="text-sm font-bold text-[var(--admin-text)] truncate">
                     {selectedUser.fullName || "User Detail"}
                   </h3>
-                  <p className="text-[11px] text-muted-foreground font-mono truncate">
+                  <p className="text-[11px] text-[var(--admin-text-muted)] font-mono truncate">
                     {selectedUser.email}
                   </p>
                 </div>
@@ -708,19 +711,19 @@ export default function Users() {
 
               <button
                 onClick={() => setDrawerOpen(false)}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
+                className="p-1.5 rounded-lg text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-elevated)] cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             {/* Drawer Navigation Tabs */}
-            <div className="flex items-center border-b border-border/40 px-5 pt-2 gap-4 text-xs font-semibold overflow-x-auto no-scrollbar">
+            <div className="flex items-center border-b border-[var(--admin-border)] px-5 pt-2 gap-4 text-xs font-semibold overflow-x-auto no-scrollbar">
               <button
                 onClick={() => setDrawerTab("profile")}
                 className={cn(
                   "pb-2 border-b-2 cursor-pointer transition-colors shrink-0",
-                  drawerTab === "profile" ? "border-primary text-foreground font-bold" : "border-transparent text-muted-foreground hover:text-foreground"
+                  drawerTab === "profile" ? "border-primary text-[var(--admin-text)] font-bold" : "border-transparent text-[var(--admin-text-muted)] hover:text-[var(--admin-text)]"
                 )}
               >
                 Profile & ID
@@ -730,7 +733,7 @@ export default function Users() {
                 onClick={() => setDrawerTab("payernt")}
                 className={cn(
                   "pb-2 border-b-2 cursor-pointer transition-colors shrink-0",
-                  drawerTab === "payernt" ? "border-emerald-500 text-emerald-500 font-bold" : "border-transparent text-muted-foreground hover:text-foreground"
+                  drawerTab === "payernt" ? "border-emerald-500 text-emerald-500 font-bold" : "border-transparent text-[var(--admin-text-muted)] hover:text-[var(--admin-text)]"
                 )}
               >
                 paye₹nt (Lender)
@@ -740,7 +743,7 @@ export default function Users() {
                 onClick={() => setDrawerTab("payrent")}
                 className={cn(
                   "pb-2 border-b-2 cursor-pointer transition-colors shrink-0",
-                  drawerTab === "payrent" ? "border-blue-500 text-blue-500 font-bold" : "border-transparent text-muted-foreground hover:text-foreground"
+                  drawerTab === "payrent" ? "border-[var(--admin-text)] text-[var(--admin-text)] font-semibold" : "border-transparent text-[var(--admin-text-muted)] hover:text-[var(--admin-text)]"
                 )}
               >
                 pay₹ent (Renter)
@@ -750,7 +753,7 @@ export default function Users() {
                 onClick={() => setDrawerTab("security")}
                 className={cn(
                   "pb-2 border-b-2 cursor-pointer transition-colors shrink-0",
-                  drawerTab === "security" ? "border-primary text-foreground font-bold" : "border-transparent text-muted-foreground hover:text-foreground"
+                  drawerTab === "security" ? "border-primary text-[var(--admin-text)] font-bold" : "border-transparent text-[var(--admin-text-muted)] hover:text-[var(--admin-text)]"
                 )}
               >
                 Security & KYC
@@ -768,46 +771,46 @@ export default function Users() {
                   {/* TAB 1: OVERVIEW & GENERAL IDENTITY */}
                   {drawerTab === "profile" && (
                     <div className="space-y-4">
-                      <div className="p-4 rounded-xl bg-secondary/30 border border-border/60 space-y-2.5">
+                      <div className="p-4 rounded-xl bg-[var(--admin-elevated)] border border-[var(--admin-border)] space-y-2.5">
                         <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Account Identifier</span>
-                          <span className="font-mono font-bold text-foreground">{selectedUser.id}</span>
+                          <span className="text-[var(--admin-text-muted)]">Account Identifier</span>
+                          <span className="font-mono font-bold text-[var(--admin-text)]">{selectedUser.id}</span>
                         </div>
                         <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Account Status</span>
-                          <span className="font-bold uppercase text-[10px] px-2 py-0.5 rounded bg-secondary border border-border/60">
+                          <span className="text-[var(--admin-text-muted)]">Account Status</span>
+                          <span className="font-bold text-[11px] px-2 py-0.5 rounded bg-[var(--admin-elevated)] border border-[var(--admin-border)]">
                             {selectedUser.status}
                           </span>
                         </div>
                         <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Platform Role</span>
-                          <span className="font-bold uppercase text-[10px] px-2 py-0.5 rounded bg-secondary border border-border/60">
+                          <span className="text-[var(--admin-text-muted)]">Platform Role</span>
+                          <span className="font-bold text-[11px] px-2 py-0.5 rounded bg-[var(--admin-elevated)] border border-[var(--admin-border)]">
                             {selectedUser.role} ({selectedUser.accountType || "Standard"})
                           </span>
                         </div>
                         <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Registration Date</span>
+                          <span className="text-[var(--admin-text-muted)]">Registration Date</span>
                           <span className="font-mono">{selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleDateString() : "—"}</span>
                         </div>
                       </div>
 
                       <div className="space-y-2">
-                        <h4 className="font-bold uppercase tracking-wider text-[10px] text-muted-foreground">Contact & Address</h4>
-                        <div className="p-3.5 rounded-xl bg-card border border-border/60 space-y-2.5">
-                          <div className="flex items-center gap-2 text-muted-foreground">
+                        <h4 className="font-bold text-[11px] text-[var(--admin-text-muted)]">Contact & Address</h4>
+                        <div className="p-3.5 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] space-y-2.5">
+                          <div className="flex items-center gap-2 text-[var(--admin-text-muted)]">
                             <Mail className="h-3.5 w-3.5 text-primary" />
-                            <span className="text-foreground font-medium">{selectedUser.email}</span>
+                            <span className="text-[var(--admin-text)] font-medium">{selectedUser.email}</span>
                           </div>
                           {selectedUser.phone && (
-                            <div className="flex items-center gap-2 text-muted-foreground">
+                            <div className="flex items-center gap-2 text-[var(--admin-text-muted)]">
                               <Phone className="h-3.5 w-3.5 text-primary" />
-                              <span className="text-foreground font-mono font-medium">{selectedUser.phone}</span>
+                              <span className="text-[var(--admin-text)] font-mono font-medium">{selectedUser.phone}</span>
                             </div>
                           )}
                           {(selectedUser.city || selectedUser.address) && (
-                            <div className="flex items-center gap-2 text-muted-foreground">
+                            <div className="flex items-center gap-2 text-[var(--admin-text-muted)]">
                               <MapPin className="h-3.5 w-3.5 text-primary" />
-                              <span className="text-foreground font-medium">
+                              <span className="text-[var(--admin-text)] font-medium">
                                 {[selectedUser.address, selectedUser.city, selectedUser.pincode].filter(Boolean).join(", ")}
                               </span>
                             </div>
@@ -823,49 +826,49 @@ export default function Users() {
                       {selectedUser.payerntAccount ? (
                         <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 space-y-3">
                           <div className="flex justify-between items-center border-b border-emerald-500/20 pb-2">
-                            <span className="font-bold text-foreground flex items-center gap-1.5">
+                            <span className="font-bold text-[var(--admin-text)] flex items-center gap-1.5">
                               <Package className="h-4 w-4 text-emerald-500" />
                               <span>paye₹nt Vendor Profile</span>
                             </span>
-                            <span className="font-mono text-[10px] text-muted-foreground">
+                            <span className="font-mono text-[11px] text-[var(--admin-text-muted)]">
                               ID: {selectedUser.payerntAccount.accountId}
                             </span>
                           </div>
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                             <div>
-                              <span className="text-muted-foreground block text-[11px]">Vendor Name</span>
-                              <span className="font-semibold text-foreground">{selectedUser.payerntAccount.name}</span>
+                              <span className="text-[var(--admin-text-muted)] block text-[11px]">Vendor Name</span>
+                              <span className="font-semibold text-[var(--admin-text)]">{selectedUser.payerntAccount.name}</span>
                             </div>
                             <div>
-                              <span className="text-muted-foreground block text-[11px]">Vendor Phone</span>
-                              <span className="font-mono font-semibold text-foreground">{selectedUser.payerntAccount.phone}</span>
+                              <span className="text-[var(--admin-text-muted)] block text-[11px]">Vendor Phone</span>
+                              <span className="font-mono font-semibold text-[var(--admin-text)]">{selectedUser.payerntAccount.phone}</span>
                             </div>
                             <div>
-                              <span className="text-muted-foreground block text-[11px]">Aadhaar (Masked)</span>
+                              <span className="text-[var(--admin-text-muted)] block text-[11px]">Aadhaar (Masked)</span>
                               <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
                                 {selectedUser.payerntAccount.aadhaarMasked} ({selectedUser.payerntAccount.aadhaarStatus})
                               </span>
                             </div>
                             <div>
-                              <span className="text-muted-foreground block text-[11px]">Payout Account</span>
-                              <span className="font-mono font-semibold text-foreground">
+                              <span className="text-[var(--admin-text-muted)] block text-[11px]">Payout Account</span>
+                              <span className="font-mono font-semibold text-[var(--admin-text)]">
                                 {selectedUser.payerntAccount.bankAccountMasked} (IFSC: {selectedUser.payerntAccount.bankIfsc})
                               </span>
                             </div>
                           </div>
                         </div>
                       ) : (
-                        <div className="p-4 rounded-xl bg-secondary/30 border border-border/60 text-muted-foreground text-center">
+                        <div className="p-4 rounded-xl bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text-muted)] text-center">
                           No dedicated paye₹nt vendor account registered under this email.
                         </div>
                       )}
 
                       {/* Wallet Balance */}
                       {selectedUser.wallet && (
-                        <div className="p-4 rounded-xl bg-card border border-border/60 space-y-2">
+                        <div className="p-4 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] space-y-2">
                           <div className="flex justify-between items-center">
-                            <span className="font-bold text-foreground flex items-center gap-1.5">
+                            <span className="font-bold text-[var(--admin-text)] flex items-center gap-1.5">
                               <Wallet className="h-4 w-4 text-emerald-500" />
                               <span>Vendor Wallet</span>
                             </span>
@@ -873,35 +876,35 @@ export default function Users() {
                               ₹{selectedUser.wallet.availableBalance.toLocaleString()}
                             </span>
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-muted-foreground pt-1 border-t border-border/40">
-                            <div>Pending: <span className="font-mono text-foreground font-semibold">₹{selectedUser.wallet.pendingAmount.toLocaleString()}</span></div>
-                            <div>Total Received: <span className="font-mono text-foreground font-semibold">₹{selectedUser.wallet.totalReceived.toLocaleString()}</span></div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-[var(--admin-text-muted)] pt-1 border-t border-[var(--admin-border)]">
+                            <div>Pending: <span className="font-mono text-[var(--admin-text)] font-semibold">₹{selectedUser.wallet.pendingAmount.toLocaleString()}</span></div>
+                            <div>Total Received: <span className="font-mono text-[var(--admin-text)] font-semibold">₹{selectedUser.wallet.totalReceived.toLocaleString()}</span></div>
                           </div>
                         </div>
                       )}
 
                       {/* Equipment Listings */}
                       <div className="space-y-2">
-                        <h4 className="font-bold uppercase tracking-wider text-[10px] text-muted-foreground">
+                        <h4 className="font-bold text-[11px] text-[var(--admin-text-muted)]">
                           Equipment Listed ({selectedUser.products?.length || 0})
                         </h4>
                         {selectedUser.products && selectedUser.products.length > 0 ? (
                           <div className="space-y-2">
                             {selectedUser.products.map((p) => (
-                              <div key={p.id} className="p-3 rounded-lg bg-card border border-border/60 flex justify-between items-center">
+                              <div key={p.id} className="p-3 rounded-lg bg-[var(--admin-card)] border border-[var(--admin-border)] flex justify-between items-center">
                                 <div>
-                                  <span className="font-bold text-foreground block">{p.title}</span>
-                                  <span className="text-[11px] font-mono text-muted-foreground">{p.id} • {p.category}</span>
+                                  <span className="font-bold text-[var(--admin-text)] block">{p.title}</span>
+                                  <span className="text-[11px] font-mono text-[var(--admin-text-muted)]">{p.id} • {p.category}</span>
                                 </div>
                                 <div className="text-right font-mono">
-                                  <span className="font-bold text-foreground">₹{p.price}/day</span>
-                                  <span className="block text-[10px] uppercase font-semibold text-emerald-500">{p.status}</span>
+                                  <span className="font-bold text-[var(--admin-text)]">₹{p.price}/day</span>
+                                  <span className="block text-[11px] font-semibold text-emerald-500">{p.status}</span>
                                 </div>
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <p className="text-xs text-muted-foreground">No active equipment listed.</p>
+                          <p className="text-xs text-[var(--admin-text-muted)]">No active equipment listed.</p>
                         )}
                       </div>
                     </div>
@@ -911,66 +914,66 @@ export default function Users() {
                   {drawerTab === "payrent" && (
                     <div className="space-y-4">
                       {selectedUser.payrentAccount ? (
-                        <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 space-y-3">
-                          <div className="flex justify-between items-center border-b border-blue-500/20 pb-2">
-                            <span className="font-bold text-foreground flex items-center gap-1.5">
-                              <ShoppingBag className="h-4 w-4 text-blue-500" />
+                        <div className="p-4 rounded-xl bg-[var(--admin-elevated)] border border-[var(--admin-border)] space-y-3">
+                          <div className="flex justify-between items-center border-b border-[var(--admin-border)] pb-2">
+                            <span className="font-bold text-[var(--admin-text)] flex items-center gap-1.5">
+                              <ShoppingBag className="h-4 w-4 text-[var(--admin-text)]" />
                               <span>pay₹ent Customer Profile</span>
                             </span>
-                            <span className="font-mono text-[10px] text-muted-foreground">
+                            <span className="font-mono text-[11px] text-[var(--admin-text-muted)]">
                               ID: {selectedUser.payrentAccount.accountId}
                             </span>
                           </div>
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                             <div>
-                              <span className="text-muted-foreground block text-[11px]">Customer Name</span>
-                              <span className="font-semibold text-foreground">{selectedUser.payrentAccount.fullName}</span>
+                              <span className="text-[var(--admin-text-muted)] block text-[11px]">Customer Name</span>
+                              <span className="font-semibold text-[var(--admin-text)]">{selectedUser.payrentAccount.fullName}</span>
                             </div>
                             <div>
-                              <span className="text-muted-foreground block text-[11px]">Phone</span>
-                              <span className="font-mono font-semibold text-foreground">{selectedUser.payrentAccount.phone}</span>
+                              <span className="text-[var(--admin-text-muted)] block text-[11px]">Phone</span>
+                              <span className="font-mono font-semibold text-[var(--admin-text)]">{selectedUser.payrentAccount.phone}</span>
                             </div>
                             <div>
-                              <span className="text-muted-foreground block text-[11px]">PAN (Masked)</span>
-                              <span className="font-mono font-semibold text-blue-600 dark:text-blue-400">
+                              <span className="text-[var(--admin-text-muted)] block text-[11px]">PAN (Masked)</span>
+                              <span className="font-mono font-semibold text-[var(--admin-text)]">
                                 {selectedUser.payrentAccount.panMasked} ({selectedUser.payrentAccount.panStatus})
                               </span>
                             </div>
                             <div>
-                              <span className="text-muted-foreground block text-[11px]">KYC Status</span>
+                              <span className="text-[var(--admin-text-muted)] block text-[11px]">KYC Status</span>
                               <span className="font-semibold text-emerald-500">{selectedUser.payrentAccount.verificationStatus}</span>
                             </div>
                           </div>
                         </div>
                       ) : (
-                        <div className="p-4 rounded-xl bg-secondary/30 border border-border/60 text-muted-foreground text-center">
+                        <div className="p-4 rounded-xl bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text-muted)] text-center">
                           No dedicated pay₹ent customer account registered under this email.
                         </div>
                       )}
 
                       {/* Bookings Made */}
                       <div className="space-y-2">
-                        <h4 className="font-bold uppercase tracking-wider text-[10px] text-muted-foreground">
+                        <h4 className="font-bold text-[11px] text-[var(--admin-text-muted)]">
                           Rental Orders & Leases ({selectedUser.bookings?.length || 0})
                         </h4>
                         {selectedUser.bookings && selectedUser.bookings.length > 0 ? (
                           <div className="space-y-2">
                             {selectedUser.bookings.map((b) => (
-                              <div key={b.id} className="p-3 rounded-lg bg-card border border-border/60 flex justify-between items-center">
+                              <div key={b.id} className="p-3 rounded-lg bg-[var(--admin-card)] border border-[var(--admin-border)] flex justify-between items-center">
                                 <div>
-                                  <span className="font-bold text-foreground block">{b.productTitle}</span>
-                                  <span className="text-[11px] font-mono text-muted-foreground">{b.startDate} → {b.endDate}</span>
+                                  <span className="font-bold text-[var(--admin-text)] block">{b.productTitle}</span>
+                                  <span className="text-[11px] font-mono text-[var(--admin-text-muted)]">{b.startDate} → {b.endDate}</span>
                                 </div>
                                 <div className="text-right font-mono">
-                                  <span className="font-bold text-foreground">₹{b.amount.toLocaleString()}</span>
-                                  <span className="block text-[10px] uppercase font-semibold text-blue-500">{b.status}</span>
+                                  <span className="font-bold text-[var(--admin-text)]">₹{b.amount.toLocaleString()}</span>
+                                  <span className="block text-[11px] font-semibold text-[var(--admin-text)]">{b.status}</span>
                                 </div>
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <p className="text-xs text-muted-foreground">No bookings made yet.</p>
+                          <p className="text-xs text-[var(--admin-text-muted)]">No bookings made yet.</p>
                         )}
                       </div>
                     </div>
@@ -979,30 +982,30 @@ export default function Users() {
                   {/* TAB 4: KYC & SECURITY */}
                   {drawerTab === "security" && (
                     <div className="space-y-4">
-                      <div className="p-4 rounded-xl bg-secondary/40 border border-border/60 space-y-3">
-                        <div className="flex items-center gap-2 font-bold text-foreground">
+                      <div className="p-4 rounded-xl bg-[var(--admin-elevated)] border border-[var(--admin-border)] space-y-3">
+                        <div className="flex items-center gap-2 font-bold text-[var(--admin-text)]">
                           <ShieldCheck className="h-4 w-4 text-emerald-500" />
                           <span>Identity Verification & Compliance</span>
                         </div>
-                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        <p className="text-[11px] text-[var(--admin-text-muted)] leading-relaxed">
                           Account has been verified against government database records with Aadhaar/PAN compliance. Secret PINs and authentication secrets are permanently masked.
                         </p>
-                        <div className="pt-2 border-t border-border/40 flex justify-between items-center font-mono">
+                        <div className="pt-2 border-t border-[var(--admin-border)] flex justify-between items-center font-mono">
                           <span>Verification State:</span>
-                          <span className={cn("font-bold uppercase", selectedUser.verified ? "text-emerald-500" : "text-amber-500")}>
+                          <span className={cn("font-bold ", selectedUser.verified ? "text-emerald-500" : "text-amber-500")}>
                             {selectedUser.verified ? "VERIFIED" : "PENDING REVIEW"}
                           </span>
                         </div>
                         {selectedUser.panNumber && (
                           <div className="flex justify-between items-center font-mono">
-                            <span className="text-muted-foreground">PAN Number:</span>
-                            <span className="font-bold text-foreground">{selectedUser.panNumber}</span>
+                            <span className="text-[var(--admin-text-muted)]">PAN Number:</span>
+                            <span className="font-bold text-[var(--admin-text)]">{selectedUser.panNumber}</span>
                           </div>
                         )}
                         {(selectedUser.aadhaarNumber || selectedUser.aadhaarMasked) && (
                           <div className="flex justify-between items-center font-mono">
-                            <span className="text-muted-foreground">Aadhaar:</span>
-                            <span className="font-bold text-foreground">{selectedUser.aadhaarNumber || selectedUser.aadhaarMasked}</span>
+                            <span className="text-[var(--admin-text-muted)]">Aadhaar:</span>
+                            <span className="font-bold text-[var(--admin-text)]">{selectedUser.aadhaarNumber || selectedUser.aadhaarMasked}</span>
                           </div>
                         )}
                         {selectedUser.rejectionReason && (
@@ -1019,13 +1022,13 @@ export default function Users() {
             </div>
 
             {/* Drawer Footer Actions */}
-            <div className="p-5 border-t border-border/60 bg-secondary/20 flex items-center justify-between gap-2">
+            <div className="p-5 border-t border-[var(--admin-border)] bg-[var(--admin-elevated)] flex items-center justify-between gap-2">
               {isPendingUser(selectedUser) ? (
                 <>
                   <button
                     onClick={() => handleApprove(selectedUser.accountId || selectedUser.id || selectedUser.email, selectedUser.accountType)}
                     disabled={actionLoading}
-                    className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all cursor-pointer"
+                    className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors cursor-pointer"
                   >
                     Approve Account
                   </button>
@@ -1038,7 +1041,7 @@ export default function Users() {
                       });
                     }}
                     disabled={actionLoading}
-                    className="flex-1 py-2.5 rounded-xl bg-destructive hover:bg-destructive/90 text-white font-bold text-xs transition-all cursor-pointer"
+                    className="flex-1 py-2.5 rounded-xl bg-destructive hover:bg-destructive/90 text-white font-bold text-xs transition-colors cursor-pointer"
                   >
                     Reject Account
                   </button>
@@ -1047,7 +1050,7 @@ export default function Users() {
                 <button
                   onClick={() => handleActivate(selectedUser.id || selectedUser.email)}
                   disabled={actionLoading}
-                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all cursor-pointer"
+                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors cursor-pointer"
                 >
                   Reactivate Account
                 </button>
@@ -1055,7 +1058,7 @@ export default function Users() {
                 <button
                   onClick={() => handleSuspend(selectedUser.id || selectedUser.email)}
                   disabled={actionLoading}
-                  className="w-full py-2.5 rounded-xl bg-destructive hover:bg-destructive/90 text-white font-bold text-xs transition-all cursor-pointer"
+                  className="w-full py-2.5 rounded-xl bg-destructive hover:bg-destructive/90 text-white font-bold text-xs transition-colors cursor-pointer"
                 >
                   Suspend Account
                 </button>
@@ -1064,6 +1067,65 @@ export default function Users() {
           </div>
         </div>
       )}
+      <Modal
+        isOpen={!!rejectModalTarget}
+        onClose={() => {
+          if (actionLoading) return;
+          setRejectModalTarget(null);
+          setRejectReasonInput("");
+        }}
+        title={`Reject ${rejectModalTarget?.type || "user"} account`}
+        size="sm"
+      >
+        <div className="p-5 space-y-4">
+          <p className="text-xs text-[var(--admin-text-muted)]">
+            Provide a reason for rejecting{" "}
+            <span className="font-semibold text-[var(--admin-text)]">
+              {rejectModalTarget?.name}
+            </span>
+            . This feedback is shown to the applicant.
+          </p>
+          <textarea
+            rows={3}
+            value={rejectReasonInput}
+            onChange={(e) => setRejectReasonInput(e.target.value)}
+            placeholder="Submitted information needs correction"
+            className="w-full p-3 rounded-lg text-xs bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] placeholder:text-[var(--admin-text-muted)] focus:outline-none focus:border-[var(--admin-text)]/40 resize-none"
+          />
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--admin-border)]">
+            <button
+              type="button"
+              disabled={actionLoading}
+              onClick={() => {
+                setRejectModalTarget(null);
+                setRejectReasonInput("");
+              }}
+              className="px-3.5 py-2 rounded-lg text-xs font-medium bg-[var(--admin-elevated)] text-[var(--admin-text)] border border-[var(--admin-border)] hover:opacity-85 transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={actionLoading}
+              onClick={handleConfirmReject}
+              className="px-3.5 py-2 rounded-lg text-xs font-semibold bg-[var(--admin-error)] text-white hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {actionLoading ? "Rejecting..." : "Reject account"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <ConfirmDialog
+        isOpen={!!suspendTargetId}
+        onClose={() => setSuspendTargetId(null)}
+        onConfirm={executeSuspend}
+        title="Suspend account"
+        description="Suspended accounts are barred from creating bookings or publishing listings until reactivated."
+        confirmLabel="Suspend account"
+        destructive
+        loading={actionLoading}
+      />
     </div>
   );
 }

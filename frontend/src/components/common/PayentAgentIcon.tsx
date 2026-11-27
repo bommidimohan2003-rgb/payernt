@@ -5,85 +5,59 @@ export interface PayentAgentIconProps {
   className?: string;
   showAccent?: boolean;
   alt?: string;
+  color?: string;
 }
 
 /**
- * paYent Agent Brand Symbol
- * - White stylized geometric "P"
- * - Deep Charcoal circular foundation (#17191C)
- * - Subtle emerald green parcel accent (#16A36A)
- * - Clean vector construction, optimized for small and large sizes
+ * paYent Cloud-Into-Message AI Agent Symbol
+ * - Distinct 3-lobe fluffy cloud silhouette with speech bubble chat pointer
+ * - Zero background box/circle (pure standalone vector glyph)
+ * - Three conversational message dots inside the cloud
+ * - Vibrant emerald live node accent (#10B981)
+ * - Generously padded in 24x24 viewBox with 0% clipping
  */
 export function PayentAgentIcon({
-  size = 26,
+  size,
   className = "",
   showAccent = true,
-  alt = "Payent Agent",
+  alt = "Payent AI Agent",
+  color,
 }: PayentAgentIconProps) {
-  const pixelSize = typeof size === "number" ? `${size}px` : size;
+  const hasDimensionClass = /\b(w-|h-)\S+/.test(className);
+  const effectiveSize = size !== undefined ? size : (hasDimensionClass ? undefined : 24);
+  const pixelSize = typeof effectiveSize === "number" ? `${effectiveSize}px` : effectiveSize;
 
   return (
     <svg
       width={pixelSize}
       height={pixelSize}
-      viewBox="0 0 32 32"
+      viewBox="0 0 24 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={`shrink-0 select-none ${className}`}
       role="img"
       aria-label={alt}
     >
-      {/* Deep Charcoal Circular Foundation */}
-      <circle cx="16" cy="16" r="16" fill="#17191C" />
-      <circle
-        cx="16"
-        cy="16"
-        r="15.25"
-        stroke="#FFFFFF"
-        strokeOpacity="0.08"
-        strokeWidth="1.5"
-      />
-
-      {/* Stem of the P */}
+      {/* Cloud into Message Speech Bubble Contour */}
       <path
-        d="M10.5 8V24"
-        stroke="#FFFFFF"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
-
-      {/* Loop of the P forming a precision parcel container */}
-      <path
-        d="M10.5 8H17C19.76 8 22 10.01 22 12.5C22 14.99 19.76 17 17 17H10.5"
-        stroke="#FFFFFF"
-        strokeWidth="2.5"
+        d="M 8.5 16.5 L 4 20.5 L 6.5 16.2 A 4.2 4.2 0 0 1 7.2 9.5 A 5.5 5.5 0 0 1 17 8.5 A 4.5 4.5 0 0 1 17.8 16.5 H 8.5 Z"
+        stroke={color || "currentColor"}
+        strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
+        fill="currentColor"
+        fillOpacity="0.14"
       />
 
-      {/* Internal parcel ribbon / route seam */}
-      <path
-        d="M10.5 12.5H21.5"
-        stroke="#FFFFFF"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-        strokeOpacity="0.4"
+      {/* 3 Message Dots inside the Cloud */}
+      <circle cx="9" cy="13" r="1.35" fill={color || "currentColor"} />
+      <circle cx="12.5" cy="13" r="1.35" fill={color || "currentColor"} />
+      <circle
+        cx="16"
+        cy="13"
+        r="1.35"
+        fill={showAccent ? "#10B981" : (color || "currentColor")}
       />
-      <path
-        d="M16 8V17"
-        stroke="#FFFFFF"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-        strokeOpacity="0.4"
-      />
-
-      {/* Waypoint base anchor */}
-      <circle cx="10.5" cy="24" r="1.25" fill="#FFFFFF" />
-
-      {/* Subtle emerald green parcel accent node */}
-      {showAccent && (
-        <circle cx="20.5" cy="8.5" r="1.75" fill="#16A36A" />
-      )}
     </svg>
   );
 }

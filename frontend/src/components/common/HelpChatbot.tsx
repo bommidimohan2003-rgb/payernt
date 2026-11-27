@@ -287,7 +287,7 @@ export function HelpChatbot() {
         whileHover={{ y: -2 }}
         whileTap={{ scale: 0.96 }}
         onClick={() => setIsOpen((prev) => !prev)}
-        className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] md:bottom-6 right-3 sm:right-6 z-40 h-12 w-12 sm:h-14 sm:w-14 rounded-2xl bg-[#17191C] text-white shadow-[0_12px_32px_-4px_rgba(23,25,28,0.38)] flex items-center justify-center border border-white/10 hover:bg-[#252930] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white focus-visible:ring-offset-2 cursor-pointer"
+        className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] md:bottom-6 right-3 sm:right-6 z-40 h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-[#17191C] text-white shadow-[0_12px_32px_-4px_rgba(23,25,28,0.38)] flex items-center justify-center border border-white/10 hover:bg-[#252930] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white focus-visible:ring-offset-2 cursor-pointer"
         aria-label="Payent Support Assistant"
       >
         <AnimatePresence mode="wait">
@@ -308,11 +308,7 @@ export function HelpChatbot() {
               exit={{ rotate: 90, opacity: 0 }}
               className="relative flex items-center justify-center"
             >
-              <PayentAgentIcon size={28} />
-              <span
-                className="absolute -top-0.5 -right-0.5 flex h-2 w-2 rounded-full bg-white border-[1.5px] border-[#17191C]"
-                aria-hidden="true"
-              />
+              <PayentAgentIcon size={32} />
             </motion.div>
           )}
         </AnimatePresence>

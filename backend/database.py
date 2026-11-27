@@ -77,7 +77,9 @@ def ensure_database_exists():
             user=MYSQL_USER,
             password=MYSQL_PASSWORD,
             cursorclass=pymysql.cursors.DictCursor,
-            connect_timeout=5,
+            connect_timeout=3,
+            read_timeout=5,
+            write_timeout=5,
             charset="utf8mb4",
             **ssl_kwargs
         )
@@ -134,7 +136,9 @@ def get_db_pool():
             password=MYSQL_PASSWORD,
             database=MYSQL_DB,
             cursorclass=pymysql.cursors.DictCursor,
-            connect_timeout=5,
+            connect_timeout=3,
+            read_timeout=5,
+            write_timeout=5,
             charset="utf8mb4",
             autocommit=True,
             **ssl_kwargs
@@ -192,6 +196,8 @@ def get_db_connection():
             database=MYSQL_DB,
             cursorclass=pymysql.cursors.DictCursor,
             connect_timeout=3,
+            read_timeout=5,
+            write_timeout=5,
             charset="utf8mb4",
             **ssl_kwargs
         )
@@ -221,7 +227,9 @@ def execute_query(query: str, params: tuple = (), retry: bool = True):
                     password=MYSQL_PASSWORD,
                     database=MYSQL_DB,
                     cursorclass=pymysql.cursors.DictCursor,
-                    connect_timeout=5,
+                    connect_timeout=3,
+                    read_timeout=5,
+                    write_timeout=5,
                     charset="utf8mb4",
                     **ssl_kwargs
                 )
@@ -1405,6 +1413,24 @@ def init_db(force: bool = False):
 
 _admin_hashed_pwd = "$2b$12$C5VVRIUA/lybUikMFKuB4eFwl..AsnVwYmblb/lfgJ0I.GXM.SYuG"
 MOCK_USERS = {
+    "mohanatta94@gmail.com": {
+        "email": "mohanatta94@gmail.com",
+        "firebase_uid": "user-uid-mohanatta94",
+        "phone": "+91 8810519885",
+        "password_hash": _admin_hashed_pwd,
+        "full_name": "mohan",
+        "role": "customer",
+        "avatar": "",
+        "address": "Gachibowli",
+        "city": "Hyderabad",
+        "pincode": "500032",
+        "created_at": dt.now(timezone.utc).isoformat(),
+        "last_login_at": dt.now(timezone.utc).isoformat(),
+        "status": "APPROVED",
+        "verified": True,
+        "is_verified": True,
+        "kyc_status": "APPROVED",
+    },
     "bommidimohan2003@gmail.com": {
         "email": "bommidimohan2003@gmail.com",
         "firebase_uid": "admin-uid-mohan",
@@ -4704,6 +4730,7 @@ def get_user_unread_support_count(user_email: str) -> int:
     return count
 
 REAL_ACCOUNTS = {
+    "mohanatta94@gmail.com",
     "bommidimohan2003@gmail.com",
     "bommidimohan304@gmail.com",
     "shinyshakhina08@gmail.com",
@@ -5929,6 +5956,39 @@ def check_auth_lockout(key: str, max_attempts: int = 5, lock_duration_secs: int 
     except Exception:
         pass
     return False, 0
+
+_OTP_DISPATCH_STORE: dict = {}
+_OTP_DISPATCH_LOCK = threading.Lock()
+
+def check_otp_dispatch_rate_limit(
+    key: str,
+    min_interval_secs: int = 3,
+    max_per_window: int = 10,
+    window_secs: int = 300
+) -> tuple[bool, int]:
+    """
+    Sub-millisecond in-memory rate limiter specifically for OTP requests.
+    Enforces a small cooldown between requests and caps total dispatches per window.
+    Never makes remote DB round-trips and never registers a failed password/auth attempt.
+    Returns (is_limited: bool, wait_secs: int).
+    """
+    now = time.time()
+    with _OTP_DISPATCH_LOCK:
+        timestamps = _OTP_DISPATCH_STORE.get(key, [])
+        timestamps = [t for t in timestamps if now - t < window_secs]
+
+        if timestamps and (now - timestamps[-1]) < min_interval_secs:
+            wait = int(min_interval_secs - (now - timestamps[-1])) + 1
+            return True, wait
+
+        if len(timestamps) >= max_per_window:
+            oldest = timestamps[0]
+            wait = int(window_secs - (now - oldest)) + 1
+            return True, wait
+
+        timestamps.append(now)
+        _OTP_DISPATCH_STORE[key] = timestamps
+        return False, 0
 
 def record_failed_auth_attempt(key: str, max_attempts: int = 5, lock_duration_secs: int = 900) -> tuple[bool, int]:
     """

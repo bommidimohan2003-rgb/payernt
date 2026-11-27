@@ -44,25 +44,25 @@ export function Pagination({
 
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 px-1">
-      <div className="text-xs font-semibold text-muted-foreground order-2 sm:order-1">
+      <div className="text-xs text-[var(--admin-text-secondary)] tabular-nums order-2 sm:order-1">
         Showing{" "}
-        <span className="text-foreground">
+        <span className="font-medium text-[var(--admin-text)]">
           {totalItems === 0 ? 0 : startIdx}
         </span>{" "}
-        to <span className="text-foreground">{endIdx}</span> of{" "}
-        <span className="text-foreground">{totalItems}</span> entries
+        to <span className="font-medium text-[var(--admin-text)]">{endIdx}</span> of{" "}
+        <span className="font-medium text-[var(--admin-text)]">{totalItems}</span>
       </div>
 
       <div className="flex items-center gap-4 order-1 sm:order-2">
         {onItemsPerPageChange && (
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-muted-foreground">
-              Rows per page:
+            <span className="text-xs text-[var(--admin-text-secondary)]">
+              Rows per page
             </span>
             <select
               value={itemsPerPage}
               onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
-              className="bg-card border border-border/80 text-foreground text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary"
+              className="h-8 bg-[var(--admin-card)] border border-[var(--admin-border)] text-[var(--admin-text)] text-xs rounded-lg px-2 tabular-nums focus:outline-none focus:border-[var(--admin-text-secondary)] cursor-pointer"
             >
               {[5, 10, 25, 50].map((size) => (
                 <option key={size} value={size}>
@@ -73,13 +73,14 @@ export function Pagination({
           </div>
         )}
 
-        <div className="flex items-center gap-1 bg-secondary/30 p-1 rounded-xl border border-border/50">
+        <div className="flex items-center gap-1 bg-[var(--admin-elevated)] p-1 rounded-lg border border-[var(--admin-border)]">
           <button
             onClick={() => onPageChange(currentPage - 1)}
             disabled={currentPage === 1}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:hover:text-muted-foreground transition-colors"
+            className="h-7 w-7 flex items-center justify-center rounded-md text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] disabled:opacity-40 transition-colors cursor-pointer"
+            aria-label="Previous page"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
           </button>
 
           {getPages().map((page) => (
@@ -87,10 +88,10 @@ export function Pagination({
               key={page}
               onClick={() => onPageChange(page)}
               className={cn(
-                "h-7 w-7 rounded-lg text-xs font-bold transition-all",
+                "h-7 min-w-7 px-2 rounded-md text-xs font-medium tabular-nums transition-colors cursor-pointer",
                 currentPage === page
-                  ? "bg-primary text-white shadow-xs"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/60",
+                  ? "bg-[var(--admin-text)] text-[var(--admin-bg)]"
+                  : "text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-card)]"
               )}
             >
               {page}
@@ -100,9 +101,10 @@ export function Pagination({
           <button
             onClick={() => onPageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:hover:text-muted-foreground transition-colors"
+            className="h-7 w-7 flex items-center justify-center rounded-md text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] disabled:opacity-40 transition-colors cursor-pointer"
+            aria-label="Next page"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
           </button>
         </div>
       </div>

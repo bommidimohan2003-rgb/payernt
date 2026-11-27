@@ -19,6 +19,7 @@ import {
   Shield,
   Layers,
   RefreshCw,
+  ClipboardPaste,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -105,6 +106,68 @@ export function PayerntAuth({
     }, 1000);
     return () => clearInterval(interval);
   }, [registerResendCooldown]);
+
+  // Read OTP and Email parameters from URL (e.g. from transactional email verification links)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const urlOtp = (params.get("otp") || params.get("code") || "").trim();
+      const urlEmail = (params.get("email") || "").trim();
+      const urlMode = (params.get("mode") || "").trim().toLowerCase();
+
+      if (urlMode === "register") {
+        setMode("register");
+        if (urlEmail) setEmail(urlEmail);
+      } else if (urlMode === "login") {
+        setMode("login");
+        if (urlEmail) {
+          setLoginEmail(urlEmail);
+          setLoginOtpEmail(urlEmail);
+        }
+      } else if (urlEmail) {
+        setLoginEmail(urlEmail);
+        setLoginOtpEmail(urlEmail);
+        setEmail(urlEmail);
+      }
+
+      if (urlOtp && /^\d{6}$/.test(urlOtp)) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(urlOtp).catch(() => {});
+        }
+
+        if (urlMode === "register") {
+          setMode("register");
+          const savedPending = sessionStorage.getItem("payernt:pending_reg");
+          if (savedPending) {
+            try {
+              const parsed = JSON.parse(savedPending);
+              setName(parsed.name || "");
+              setEmail(parsed.email || urlEmail || "");
+              setPhone(parsed.phone || "");
+              setPassword(parsed.password || "");
+              setRegisterStep("otp");
+              setRegisterOtpDigits(urlOtp.split(""));
+              setRegisterOtpError(null);
+              toast.success(`Verification code ${urlOtp} auto-filled and copied to clipboard!`);
+              return;
+            } catch {}
+          }
+          sessionStorage.setItem("payernt:pending_reg_otp", urlOtp);
+          toast.success(`Verification code ${urlOtp} copied to clipboard! Complete form to verify.`);
+        } else {
+          // Login OTP flow
+          setMode("login");
+          setAuthMode("otp");
+          setLoginOtpStep("verify");
+          if (urlEmail) setLoginOtpEmail(urlEmail);
+          setLoginOtpDigits(urlOtp.split(""));
+          setLoginOtpError(null);
+          toast.success(`Verification code ${urlOtp} auto-filled and copied to clipboard!`);
+        }
+      }
+    } catch {}
+  }, []);
 
   const handleCheckUser = async () => {
     const cleanName = name.trim();
@@ -438,6 +501,33 @@ export function PayerntAuth({
     }
   };
 
+  const handlePasteLoginFromClipboard = async () => {
+    try {
+      if (!navigator.clipboard || !navigator.clipboard.readText) {
+        toast.info("Please press Ctrl+V / Cmd+V in the box to paste.");
+        return;
+      }
+      const text = await navigator.clipboard.readText();
+      const clean = text.replace(/\D/g, "").slice(0, 6);
+      if (!clean) {
+        toast.error("No numeric verification code found in clipboard.");
+        return;
+      }
+      const updated = ["", "", "", "", "", ""];
+      for (let i = 0; i < clean.length; i++) updated[i] = clean[i];
+      setLoginOtpDigits(updated);
+      setLoginOtpError(null);
+      toast.success(`Pasted code ${clean}`);
+      const targetIndex = Math.min(clean.length, 5);
+      loginOtpInputRefs.current[targetIndex]?.focus();
+      if (clean.length === 6) {
+        handleVerifyLoginOtp(clean);
+      }
+    } catch {
+      toast.info("Please press Ctrl+V / Cmd+V in the box to paste.");
+    }
+  };
+
   // --- REGISTER SUBMIT (REQUEST EMAIL OTP) ---
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -496,8 +586,22 @@ export function PayerntAuth({
       });
 
       if (res.success) {
+        try {
+          sessionStorage.setItem("payernt:pending_reg", JSON.stringify({
+            name: cleanName,
+            email: cleanEmail,
+            phone: cleanPhone,
+            password,
+          }));
+        } catch {}
         setRegisterStep("otp");
-        setRegisterOtpDigits(["", "", "", "", "", ""]);
+        const preloadedOtp = typeof window !== "undefined" ? sessionStorage.getItem("payernt:pending_reg_otp") : null;
+        if (preloadedOtp && /^\d{6}$/.test(preloadedOtp)) {
+          setRegisterOtpDigits(preloadedOtp.split(""));
+          sessionStorage.removeItem("payernt:pending_reg_otp");
+        } else {
+          setRegisterOtpDigits(["", "", "", "", "", ""]);
+        }
         setRegisterResendCooldown(60);
         toast.success(`Verification code sent to ${cleanEmail}`);
         setTimeout(() => {
@@ -630,6 +734,33 @@ export function PayerntAuth({
     }
   };
 
+  const handlePasteRegisterFromClipboard = async () => {
+    try {
+      if (!navigator.clipboard || !navigator.clipboard.readText) {
+        toast.info("Please press Ctrl+V / Cmd+V in the box to paste.");
+        return;
+      }
+      const text = await navigator.clipboard.readText();
+      const clean = text.replace(/\D/g, "").slice(0, 6);
+      if (!clean) {
+        toast.error("No numeric verification code found in clipboard.");
+        return;
+      }
+      const updated = ["", "", "", "", "", ""];
+      for (let i = 0; i < clean.length; i++) updated[i] = clean[i];
+      setRegisterOtpDigits(updated);
+      setRegisterOtpError(null);
+      toast.success(`Pasted code ${clean}`);
+      const targetIndex = Math.min(clean.length, 5);
+      registerOtpInputRefs.current[targetIndex]?.focus();
+      if (clean.length === 6) {
+        handleVerifyRegisterOtp(clean);
+      }
+    } catch {
+      toast.info("Please press Ctrl+V / Cmd+V in the box to paste.");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col justify-between selection:bg-primary selection:text-primary-foreground relative overflow-x-hidden">
       {/* Top Header Navigation */}
@@ -686,7 +817,7 @@ export function PayerntAuth({
 
           {/* Right Section — Authentication Form Card */}
           <div className="lg:col-span-6 xl:col-span-6 flex justify-center lg:justify-end">
-            <div className="relative w-full max-w-lg shadow-xl border border-neutral-300/80 bg-card/95 dark:bg-[#1E1E1E] dark:border-neutral-700/80 backdrop-blur-2xl rounded-2xl pt-5 sm:pt-6 p-5 sm:p-6.5 space-y-3.5 sm:space-y-4 transition-all duration-300 text-left">
+            <div className="relative w-full max-w-lg shadow-xl border border-neutral-300/80 bg-card/95 dark:bg-[#1E1E1E] dark:border-neutral-700/80 backdrop-blur-2xl rounded-2xl pt-4.5 sm:pt-5 p-4.5 sm:p-5.5 space-y-3 transition-all duration-300 text-left">
               <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
                 <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
                   {mode === "login" ? "Sign In to Payernt" : "Create Payernt Account"}
@@ -694,7 +825,7 @@ export function PayerntAuth({
               </div>
 
               {/* Form Heading Subtitle */}
-              <div className="space-y-1 text-left pb-1">
+              <div className="space-y-0.5 text-left pb-0.5">
                 <p className="text-xs text-muted-foreground font-normal">
                   {mode === "login"
                     ? "Enter your credentials to manage your product listings."
@@ -865,7 +996,7 @@ export function PayerntAuth({
                           }}
                           className="w-full font-bold h-10.5 sm:h-11 rounded-xl border border-border/80 dark:border-neutral-700/80 bg-secondary/50 hover:bg-secondary dark:bg-[#252525] dark:hover:bg-[#2A2A2A] text-foreground transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 text-xs sm:text-sm"
                         >
-                          <Mail className="h-4 w-4 text-primary shrink-0" />
+                          <Mail className="h-4 w-4 text-primary shrink-0 stroke-[1.8]" />
                           <span>Sign in with Email OTP</span>
                         </button>
                       </form>
@@ -920,11 +1051,11 @@ export function PayerntAuth({
                             {isSendingLoginOtp ? (
                               <div className="flex items-center gap-2">
                                 <Loader2 className="h-4 w-4 animate-spin" />
-                                <span>Sending Login Code...</span>
+                                <span>Sending login code...</span>
                               </div>
                             ) : (
                               <>
-                                <span>Send Login Code</span>
+                                <span>Send login code</span>
                                 <ArrowRight className="h-4 w-4" />
                               </>
                             )}
@@ -953,38 +1084,50 @@ export function PayerntAuth({
                             }}
                             className="w-full font-bold h-10.5 sm:h-11 rounded-xl border border-border/80 dark:border-neutral-700/80 bg-secondary/50 hover:bg-secondary dark:bg-[#252525] dark:hover:bg-[#2A2A2A] text-foreground transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 text-xs sm:text-sm"
                           >
-                            <Lock className="h-4 w-4 text-primary shrink-0" />
-                            <span>Sign in with Password</span>
+                            <Lock className="h-4 w-4 text-primary shrink-0 stroke-[1.8]" />
+                            <span>Sign in with password</span>
                           </button>
                         </form>
                       ) : (
                         /* OTP Verification View */
                         <div className="space-y-4">
-                          <div className="text-center space-y-1">
-                            <p className="text-xs text-muted-foreground leading-relaxed">
-                              Enter the 6-digit login code sent to{" "}
-                              <span className="font-bold text-foreground">{loginOtpEmail}</span>
-                            </p>
-                            <div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setLoginOtpStep("request");
-                                  setLoginOtpError(null);
-                                }}
-                                className="text-[11px] font-semibold text-primary hover:underline cursor-pointer inline-flex items-center gap-1"
-                              >
-                                <ArrowLeft className="h-3 w-3" />
-                                <span>Change email address</span>
-                              </button>
+                          {/* Target Email Check & Change */}
+                          <div className="p-3 rounded-xl bg-secondary/40 border border-border/70 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <Mail className="h-4 w-4 text-primary shrink-0" />
+                              <div className="min-w-0 text-left">
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Code sent to</p>
+                                <p className="text-xs font-bold text-foreground truncate">{loginOtpEmail}</p>
+                              </div>
                             </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLoginOtpStep("request");
+                                setLoginOtpError(null);
+                              }}
+                              className="text-xs font-semibold text-primary hover:underline shrink-0 cursor-pointer"
+                            >
+                              Change
+                            </button>
                           </div>
 
                           {/* 6 Digit Input Group */}
                           <div className="space-y-3">
-                            <label className="block text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                              Enter 6-Digit Code
-                            </label>
+                            <div className="flex items-center justify-between px-1">
+                              <label className="text-xs font-medium text-muted-foreground">
+                                Enter 6-digit code
+                              </label>
+                              <button
+                                type="button"
+                                onClick={handlePasteLoginFromClipboard}
+                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline cursor-pointer transition-colors"
+                                title="Paste 6-digit code from clipboard"
+                              >
+                                <ClipboardPaste className="h-3.5 w-3.5" />
+                                <span>Paste code</span>
+                              </button>
+                            </div>
                             <div className="flex items-center justify-center gap-2 sm:gap-2.5" onPaste={handleLoginPaste}>
                               {loginOtpDigits.map((digit, i) => (
                                 <input
@@ -1027,29 +1170,19 @@ export function PayerntAuth({
                             {isVerifyingLoginOtp ? (
                               <div className="flex items-center gap-2">
                                 <Loader2 className="h-4 w-4 animate-spin" />
-                                <span>Verifying Code...</span>
+                                <span>Verifying code...</span>
                               </div>
                             ) : (
                               <>
                                 <CheckCircle2 className="h-4 w-4 shrink-0" />
-                                <span>Verify & Sign In</span>
+                                <span>Verify & sign in</span>
                               </>
                             )}
                           </button>
 
                           {/* Resend & Back */}
                           <div className="flex items-center justify-between pt-1 text-xs">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setLoginOtpStep("request");
-                                setLoginOtpError(null);
-                              }}
-                              className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground font-semibold transition-colors cursor-pointer"
-                            >
-                              <ArrowLeft className="h-3.5 w-3.5" />
-                              <span>Back</span>
-                            </button>
+                            <span className="text-[11px] text-muted-foreground">Code valid for 5 minutes</span>
 
                             <div>
                               {loginResendCooldown > 0 ? (
@@ -1071,7 +1204,7 @@ export function PayerntAuth({
                                   ) : (
                                     <>
                                       <RefreshCw className="h-3 w-3" />
-                                      <span>Resend Code</span>
+                                      <span>Resend code</span>
                                     </>
                                   )}
                                 </button>
@@ -1079,12 +1212,8 @@ export function PayerntAuth({
                             </div>
                           </div>
 
-                          <div className="p-2.5 rounded-xl bg-secondary/50 border border-border/60 text-[11px] text-muted-foreground text-center">
-                            <span>Code is valid for 5 minutes. Check spam or junk folder if not received.</span>
-                          </div>
-
                           {/* OR Divider */}
-                          <div className="relative my-4">
+                          <div className="relative my-3">
                             <div className="absolute inset-0 flex items-center">
                               <div className="w-full border-t border-border/70 dark:border-[#2D2D2D]" />
                             </div>
@@ -1095,6 +1224,7 @@ export function PayerntAuth({
                             </div>
                           </div>
 
+                          {/* Switch to Password Button */}
                           <button
                             type="button"
                             onClick={() => {
@@ -1105,8 +1235,8 @@ export function PayerntAuth({
                             }}
                             className="w-full font-bold h-10.5 sm:h-11 rounded-xl border border-border/80 dark:border-neutral-700/80 bg-secondary/50 hover:bg-secondary dark:bg-[#252525] dark:hover:bg-[#2A2A2A] text-foreground transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 text-xs sm:text-sm"
                           >
-                            <Lock className="h-4 w-4 text-primary shrink-0" />
-                            <span>Sign in with Password</span>
+                            <Lock className="h-4 w-4 text-primary shrink-0 stroke-[1.8]" />
+                            <span>Sign in with password</span>
                           </button>
                         </div>
                       )
@@ -1141,47 +1271,48 @@ export function PayerntAuth({
                     className="space-y-3 text-left"
                   >
                     {registerStep === "details" ? (
-                      <form onSubmit={handleRegisterSubmit} className="space-y-3">
-                        {/* 1. Full Name */}
-                        <div className="w-full relative pt-1.5">
-                          <div
-                            className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
-                              registerErrors.name ? "border-destructive focus-within:ring-destructive/30" : ""
-                            }`}
-                          >
-                            <label
-                              htmlFor="payernt-register-name"
-                              className={`absolute -top-2.5 left-3.5 px-1.5 bg-card text-[11px] font-semibold tracking-tight transition-colors pointer-events-none select-none z-10 ${
-                                registerErrors.name ? "text-destructive" : "text-muted-foreground group-focus-within:text-primary"
+                      <form onSubmit={handleRegisterSubmit} className="space-y-2.5">
+                        {/* 1. Full Name & Mobile Number in 2-col grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {/* Full Name */}
+                          <div className="w-full relative pt-1.5">
+                            <div
+                              className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10 sm:h-10.5 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
+                                registerErrors.name ? "border-destructive focus-within:ring-destructive/30" : ""
                               }`}
                             >
-                              Full Name <span className="text-destructive">*</span>
-                            </label>
-                            <span className="text-muted-foreground shrink-0 flex items-center justify-center">
-                              <User className="h-4 w-4" />
-                            </span>
-                            <input
-                              id="payernt-register-name"
-                              type="text"
-                              autoComplete="name"
-                              value={name}
-                              onChange={(e) => {
-                                setName(e.target.value);
-                                if (registerErrors.name) setRegisterErrors((prev) => ({ ...prev, name: undefined }));
-                              }}
-                              className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
-                            />
+                              <label
+                                htmlFor="payernt-register-name"
+                                className={`absolute -top-2.5 left-3.5 px-1.5 bg-card text-[11px] font-semibold tracking-tight transition-colors pointer-events-none select-none z-10 ${
+                                  registerErrors.name ? "text-destructive" : "text-muted-foreground group-focus-within:text-primary"
+                                }`}
+                              >
+                                Full Name <span className="text-destructive">*</span>
+                              </label>
+                              <span className="text-muted-foreground shrink-0 flex items-center justify-center">
+                                <User className="h-4 w-4" />
+                              </span>
+                              <input
+                                id="payernt-register-name"
+                                type="text"
+                                autoComplete="name"
+                                value={name}
+                                onChange={(e) => {
+                                  setName(e.target.value);
+                                  if (registerErrors.name) setRegisterErrors((prev) => ({ ...prev, name: undefined }));
+                                }}
+                                className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
+                              />
+                            </div>
+                            {registerErrors.name && (
+                              <p className="mt-1 text-xs text-destructive">{registerErrors.name}</p>
+                            )}
                           </div>
-                          {registerErrors.name && (
-                            <p className="mt-1 text-xs text-destructive">{registerErrors.name}</p>
-                          )}
-                        </div>
 
-                        {/* 2. Mobile Number & Check button */}
-                        <div className="w-full relative pt-1.5">
-                          <div className="flex items-start gap-2">
+                          {/* Mobile Number */}
+                          <div className="w-full relative pt-1.5">
                             <div
-                              className={`group relative flex-1 flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
+                              className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10 sm:h-10.5 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
                                 registerErrors.phone ? "border-destructive focus-within:ring-destructive/30" : ""
                               }`}
                             >
@@ -1210,29 +1341,16 @@ export function PayerntAuth({
                                 className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
                               />
                             </div>
-                            <button
-                              type="button"
-                              onClick={handleCheckUser}
-                              disabled={isChecking}
-                              className="h-10.5 sm:h-11 px-3.5 rounded-xl border border-neutral-400/80 dark:border-neutral-600 bg-secondary hover:bg-secondary/80 text-foreground font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shrink-0 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1.5"
-                              title="Check existing account records"
-                            >
-                              {isChecking ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <span>Check</span>
-                              )}
-                            </button>
+                            {registerErrors.phone && (
+                              <p className="mt-1 text-xs text-destructive">{registerErrors.phone}</p>
+                            )}
                           </div>
-                          {registerErrors.phone && (
-                            <p className="mt-1 text-xs text-destructive">{registerErrors.phone}</p>
-                          )}
                         </div>
 
-                        {/* 3. Email Address */}
+                        {/* 2. Email Address */}
                         <div className="w-full relative pt-1.5">
                           <div
-                            className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
+                            className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10 sm:h-10.5 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
                               registerErrors.email ? "border-destructive focus-within:ring-destructive/30" : ""
                             }`}
                           >
@@ -1264,12 +1382,12 @@ export function PayerntAuth({
                           )}
                         </div>
 
-                        {/* Password & Confirm Password */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* 3. Password & Confirm Password */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                           {/* Password */}
                           <div className="w-full relative pt-1.5">
                             <div
-                              className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
+                              className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10 sm:h-10.5 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
                                 registerErrors.password ? "border-destructive focus-within:ring-destructive/30" : ""
                               }`}
                             >
@@ -1312,7 +1430,7 @@ export function PayerntAuth({
                           {/* Confirm Password */}
                           <div className="w-full relative pt-1.5">
                             <div
-                              className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
+                              className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10 sm:h-10.5 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
                                 registerErrors.confirmPassword ? "border-destructive focus-within:ring-destructive/30" : ""
                               }`}
                             >
@@ -1355,9 +1473,9 @@ export function PayerntAuth({
 
                         {/* Password Requirements Guidance */}
                         {password.length > 0 && !isPasswordValid && (
-                          <div className="p-2.5 rounded-xl bg-secondary/80 border border-border/80 text-[11px] space-y-1 text-muted-foreground">
+                          <div className="p-2 rounded-lg bg-secondary/80 border border-border/80 text-[10px] space-y-0.5 text-muted-foreground">
                             <p className="font-semibold text-foreground">Password requirements:</p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                            <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
                               <span className={hasMinLen ? "text-emerald-500 font-medium" : ""}>
                                 • 8+ characters
                               </span>
@@ -1375,7 +1493,7 @@ export function PayerntAuth({
                         )}
 
                         {/* Terms & Conditions Checkbox with Animated Circle Tick */}
-                        <div className="pt-2">
+                        <div className="pt-1">
                           <label className="flex items-center gap-2.5 text-xs cursor-pointer select-none group">
                             <input
                               type="checkbox"
@@ -1409,7 +1527,7 @@ export function PayerntAuth({
                         <button
                           type="submit"
                           disabled={isRegistering}
-                          className="w-full font-extrabold h-10.5 sm:h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-50"
+                          className="w-full font-extrabold h-10 sm:h-10.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-1.5 disabled:opacity-50"
                         >
                           {isRegistering ? (
                             <div className="flex items-center gap-2">
@@ -1427,18 +1545,43 @@ export function PayerntAuth({
                     ) : (
                       /* EMAIL OTP VERIFICATION STEP */
                       <div className="space-y-4">
-                        <div className="text-center space-y-1">
-                          <p className="text-xs text-muted-foreground leading-relaxed">
-                            Enter the 6-digit verification code sent to{" "}
-                            <span className="font-bold text-foreground">{email}</span>
-                          </p>
+                        {/* Target Email Check & Change */}
+                        <div className="p-3 rounded-xl bg-secondary/40 border border-border/70 flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <Mail className="h-4 w-4 text-primary shrink-0" />
+                            <div className="min-w-0 text-left">
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Code sent to</p>
+                              <p className="text-xs font-bold text-foreground truncate">{email}</p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRegisterStep("details");
+                              setRegisterOtpError(null);
+                            }}
+                            className="text-xs font-semibold text-primary hover:underline shrink-0 cursor-pointer"
+                          >
+                            Change
+                          </button>
                         </div>
 
                         {/* 6 Digit Input Group */}
                         <div className="space-y-3">
-                          <label className="block text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                            Enter 6-Digit Code
-                          </label>
+                          <div className="flex items-center justify-between px-1">
+                            <label className="text-xs font-medium text-muted-foreground">
+                              Enter 6-digit verification code
+                            </label>
+                            <button
+                              type="button"
+                              onClick={handlePasteRegisterFromClipboard}
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline cursor-pointer transition-colors"
+                              title="Paste 6-digit code from clipboard"
+                            >
+                              <ClipboardPaste className="h-3.5 w-3.5" />
+                              <span>Paste code</span>
+                            </button>
+                          </div>
                           <div className="flex items-center justify-center gap-2 sm:gap-2.5" onPaste={handleRegisterPaste}>
                             {registerOtpDigits.map((digit, i) => (
                               <input
@@ -1481,29 +1624,19 @@ export function PayerntAuth({
                           {isVerifyingRegisterOtp ? (
                             <div className="flex items-center gap-2">
                               <Loader2 className="h-4 w-4 animate-spin" />
-                              <span>Verifying Code...</span>
+                              <span>Verifying code...</span>
                             </div>
                           ) : (
                             <>
                               <CheckCircle2 className="h-4 w-4 shrink-0" />
-                              <span>Verify & Complete Registration</span>
+                              <span>Verify & complete registration</span>
                             </>
                           )}
                         </button>
 
                         {/* Resend & Back Navigation */}
                         <div className="flex items-center justify-between pt-1 text-xs">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setRegisterStep("details");
-                              setRegisterOtpError(null);
-                            }}
-                            className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground font-semibold transition-colors cursor-pointer"
-                          >
-                            <ArrowLeft className="h-3.5 w-3.5" />
-                            <span>Back to Details</span>
-                          </button>
+                          <span className="text-[11px] text-muted-foreground">Code valid for 5 minutes</span>
 
                           <div>
                             {registerResendCooldown > 0 ? (
@@ -1525,16 +1658,12 @@ export function PayerntAuth({
                                 ) : (
                                   <>
                                     <RefreshCw className="h-3 w-3" />
-                                    <span>Resend Code</span>
+                                    <span>Resend code</span>
                                   </>
                                 )}
                               </button>
                             )}
                           </div>
-                        </div>
-
-                        <div className="p-2.5 rounded-xl bg-secondary/50 border border-border/60 text-[11px] text-muted-foreground text-center">
-                          <span>Code is valid for 5 minutes. Check spam or junk folder if you don't see it immediately.</span>
                         </div>
                       </div>
                     )}
@@ -1562,12 +1691,8 @@ export function PayerntAuth({
               </AnimatePresence>
 
               {/* Security Footnote */}
-              <div className="pt-4 border-t border-border/60 flex items-center justify-between text-[11px] text-muted-foreground font-medium">
-                <span className="flex items-center gap-1.5">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                  256-Bit SSL Encrypted
-                </span>
-                <span>Protected Escrow</span>
+              <div className="pt-3 border-t border-border/60 flex items-center justify-center text-[11px] text-muted-foreground">
+                <span>Secure peer-to-peer equipment rental</span>
               </div>
             </div>
           </div>
@@ -1576,7 +1701,7 @@ export function PayerntAuth({
 
       {/* Footer */}
       <footer className="w-full border-t border-border/60 py-4 text-center text-[11px] text-muted-foreground">
-        <span>Payent Payernt Product Owner Platform • Protected by End-to-End Encryption</span>
+        <span>Payent Payernt Product Owner Platform</span>
       </footer>
     </div>
   );

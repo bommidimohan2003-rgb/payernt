@@ -30,7 +30,8 @@ from email_service import (
     build_password_reset_email_text,
     build_otp_email_html,
     build_otp_email_text,
-    is_smtp_configured
+    is_smtp_configured,
+    dispatch_otp_email
 )
 
 # Load env variables at application startup if dotenv is available (local dev)
@@ -41,7 +42,7 @@ except ImportError:
     pass
 
 from fastapi import FastAPI, HTTPException, Header, Depends, Query, Body, status, Request, Response, WebSocket, WebSocketDisconnect, BackgroundTasks
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -130,6 +131,7 @@ from database import (
     revoke_token,
     is_token_revoked,
     check_auth_lockout,
+    check_otp_dispatch_rate_limit,
     record_failed_auth_attempt,
     clear_failed_auth_attempts,
     increment_otp_attempt,
@@ -292,6 +294,7 @@ from config import (
     ALLOWED_ORIGINS,
     IS_PRODUCTION,
     ALLOW_PRODUCTION_TESTING,
+    FRONTEND_URL,
     GOOGLE_CLIENT_ID,
     RAZORPAY_KEY_ID,
     RAZORPAY_KEY_SECRET,
@@ -1201,15 +1204,15 @@ class RefreshTokenSchema(BaseModel):
 @app.post("/api/register/request")
 def register_request(data: OTPRequestSchema, request: Request):
     client_ip = request.client.host if request.client else "unknown"
-    key = f"regreq:{client_ip}"
-    is_locked, secs = record_failed_auth_attempt(key, max_attempts=5, lock_duration_secs=600)
-    if is_locked:
+    clean_email = data.email.lower().strip()
+
+    # Fast in-memory throttling (3s cooldown, max 10 requests per 5 minutes)
+    is_limited, wait_secs = check_otp_dispatch_rate_limit(f"regreq:{client_ip}:{clean_email}", min_interval_secs=3, max_per_window=10, window_secs=300)
+    if is_limited:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Too many registration requests. Please try again in {secs // 60} minutes."
+            detail=f"Please wait {wait_secs} seconds before requesting another code."
         )
-
-    clean_email = data.email.lower().strip()
     clean_phone = normalize_phone(data.phone)
     
     # Check if account already exists
@@ -1235,22 +1238,20 @@ def register_request(data: OTPRequestSchema, request: Request):
     else:
         save_otp(clean_email, clean_phone, result["otp"])
 
-        # If SMTP mailer is configured, dispatch the 6-digit OTP to the user's email
-        email_sent = False
-        if is_smtp_configured():
-            try:
-                subject = f"{result['otp']} is your paYent verification code"
-                html = build_otp_email_html(result["otp"], "account registration")
-                text = build_otp_email_text(result["otp"], "account registration")
-                email_sent, err = send_email_smtp(clean_email, subject, html, text)
-                if email_sent:
-                    logger.info(f"OTP email successfully dispatched to {mask_email_safely(clean_email)}")
-                else:
-                    logger.warning(f"Failed to dispatch OTP email to {mask_email_safely(clean_email)}: {err}")
-            except Exception as e:
-                logger.error(f"Error during OTP email dispatch: {e}")
-
+        # If SMTP mailer is configured, dispatch the 6-digit OTP to the user's email asynchronously (<15ms response)
+        host = request.headers.get("host") or ""
+        proto = "https" if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https" else "http"
+        backend_base = f"{proto}://{host}" if host else os.getenv("BACKEND_URL", "http://127.0.0.1:8001")
+        action_url = f"{backend_base}/api/auth/copy?otp={result['otp']}"
+        email_sent, err = dispatch_otp_email(
+            clean_email,
+            result["otp"],
+            purpose="account registration",
+            action_url=action_url,
+            sync=False
+        )
         if email_sent:
+            logger.info(f"OTP email successfully queued for {mask_email_safely(clean_email)}")
             return {"success": True, "message": "Verification code has been sent to your email."}
         return {"success": True, "otp": result["otp"], "message": "Verification code generated successfully."}
 
@@ -1801,19 +1802,12 @@ def login_otp_request(data: LoginOTPRequestSchema, request: Request):
     ip_key = f"login_otp_req_ip:{client_ip}"
     user_key = f"login_otp_req_user:{clean_email}"
 
-    # Rate limiting: max 5 requests per 10 minutes
-    is_locked_ip, secs_ip = record_failed_auth_attempt(ip_key, max_attempts=10, lock_duration_secs=600)
-    if is_locked_ip:
+    # Fast in-memory throttling (3s cooldown between requests, max 10 requests per 5 minutes)
+    is_limited, wait_secs = check_otp_dispatch_rate_limit(f"login_otp:{clean_email}:{client_ip}", min_interval_secs=3, max_per_window=10, window_secs=300)
+    if is_limited:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Too many OTP requests from this IP. Please try again in {max(1, secs_ip // 60)} minutes."
-        )
-
-    is_locked_user, secs_user = record_failed_auth_attempt(user_key, max_attempts=5, lock_duration_secs=600)
-    if is_locked_user:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Too many OTP requests for this account. Please try again in {max(1, secs_user // 60)} minutes."
+            detail=f"Please wait {wait_secs} seconds before requesting another code."
         )
 
     user = get_user(clean_email)
@@ -1863,24 +1857,194 @@ def login_otp_request(data: LoginOTPRequestSchema, request: Request):
     save_otp(clean_email, clean_phone, otp)
     logger.info(f"[Login OTP] 6-digit login verification code generated for {mask_email_safely(clean_email)}")
 
-    # Dispatch via SMTP if configured
-    email_sent = False
-    if is_smtp_configured():
-        try:
-            subject = f"{otp} is your paYent sign-in code"
-            html = build_otp_email_html(otp, "sign in to your paYent account")
-            text = build_otp_email_text(otp, "sign in to your paYent account")
-            email_sent, err = send_email_smtp(clean_email, subject, html, text)
-            if email_sent:
-                logger.info(f"Login OTP email successfully dispatched to {mask_email_safely(clean_email)}")
-            else:
-                logger.warning(f"Failed to dispatch login OTP email to {mask_email_safely(clean_email)}: {err}")
-        except Exception as e:
-            logger.error(f"Error during login OTP email dispatch: {e}")
-
+    # Dispatch via SMTP if configured (asynchronous background queue for instant <15ms response)
+    host = request.headers.get("host") or ""
+    proto = "https" if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https" else "http"
+    backend_base = f"{proto}://{host}" if host else os.getenv("BACKEND_URL", "http://127.0.0.1:8001")
+    action_url = f"{backend_base}/api/auth/copy?otp={otp}"
+    email_sent, err = dispatch_otp_email(
+        clean_email,
+        otp,
+        purpose="sign in to your paYent account",
+        action_url=action_url,
+        sync=False
+    )
     if email_sent:
+        logger.info(f"Login OTP email successfully queued for {mask_email_safely(clean_email)}")
         return {"success": True, "message": "Verification code has been sent to your email."}
     return {"success": True, "otp": otp, "message": "Verification code generated successfully."}
+
+
+@app.get("/api/auth/copy", response_class=HTMLResponse)
+@app.get("/api/login/copy", response_class=HTMLResponse)
+def copy_otp_page(otp: str = Query("", description="6-digit verification code")):
+    """
+    Renders a dedicated, instant micro-page that copies the 6-digit OTP code to the OS clipboard.
+    Does NOT redirect back to the login form, allowing the user to simply switch to
+    their open Payent browser tab and paste the code.
+    """
+    clean_otp = re.sub(r"[^\d]", "", otp)[:6]
+    display_code = clean_otp if len(clean_otp) == 6 else "••••••"
+    return HTMLResponse(content=f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verification Code Copied • paYent</title>
+  <style>
+    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+    body {{
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #090a0c;
+      color: #f1f5f9;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }}
+    .card {{
+      background-color: #111317;
+      border: 1px solid #23272f;
+      border-radius: 20px;
+      padding: 36px 32px;
+      max-width: 440px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    }}
+    .brand {{
+      font-size: 24px;
+      font-weight: 900;
+      color: #10b981;
+      letter-spacing: -0.5px;
+      margin-bottom: 24px;
+    }}
+    .badge {{
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background-color: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #10b981;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      transition: all 0.2s ease;
+    }}
+    .code-box {{
+      font-family: "Courier New", Courier, Consolas, monospace;
+      font-size: 42px;
+      font-weight: 800;
+      letter-spacing: 12px;
+      color: #10b981;
+      background-color: #090a0c;
+      border: 2px dashed #10b981;
+      border-radius: 14px;
+      padding: 16px 20px;
+      margin: 0 auto 24px auto;
+      user-select: all;
+      -webkit-user-select: all;
+      max-width: 320px;
+    }}
+    .instruction {{
+      font-size: 14px;
+      line-height: 1.6;
+      color: #94a3b8;
+      margin-bottom: 24px;
+    }}
+    .instruction strong {{
+      color: #f8fafc;
+    }}
+    .copy-btn {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      background-color: #10b981;
+      color: #090a0c;
+      border: none;
+      border-radius: 12px;
+      padding: 14px 20px;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 0.1s ease, background-color 0.15s ease;
+    }}
+    .copy-btn:hover {{
+      background-color: #059669;
+    }}
+    .copy-btn:active {{
+      transform: scale(0.98);
+    }}
+    .hint {{
+      margin-top: 20px;
+      font-size: 12px;
+      color: #64748b;
+    }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">paYent</div>
+    <div id="badge" class="badge">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      <span id="badge-text">Verification Code Copied</span>
+    </div>
+    <div class="code-box" id="code-box">{display_code}</div>
+    <p class="instruction">
+      Your 6-digit code has been copied to your clipboard.<br />
+      Return to your <strong>Payent</strong> tab and click <strong>Paste code</strong>.
+    </p>
+    <button id="copy-btn" class="copy-btn" onclick="copyCode()">
+      <span id="btn-text">📋 Copy Code Again ({display_code})</span>
+    </button>
+    <p class="hint">This page does not navigate away. You can safely close it.</p>
+  </div>
+
+  <script>
+    const code = "{clean_otp}";
+    function copyCode() {{
+      if (!code) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {{
+        navigator.clipboard.writeText(code).then(onCopied).catch(fallbackCopy);
+      }} else {{
+        fallbackCopy();
+      }}
+    }}
+    function fallbackCopy() {{
+      const ta = document.createElement("textarea");
+      ta.value = code;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try {{
+        document.execCommand("copy");
+        onCopied();
+      }} catch(e) {{}}
+      document.body.removeChild(ta);
+    }}
+    function onCopied() {{
+      const badgeText = document.getElementById("badge-text");
+      const btnText = document.getElementById("btn-text");
+      if (badgeText) badgeText.innerText = "✓ Code Copied to Clipboard";
+      if (btnText) {{
+        btnText.innerText = "✓ Copied ({clean_otp})";
+        setTimeout(() => {{
+          btnText.innerText = "📋 Copy Code Again ({clean_otp})";
+        }}, 2000);
+      }}
+    }}
+    // Auto-copy immediately on page load
+    try {{ copyCode(); }} catch(e) {{}}
+  </script>
+</body>
+</html>""")
 
 
 @app.post("/api/login/otp/verify")
@@ -2360,8 +2524,10 @@ def get_me(current_user_email: str = Depends(get_current_user_email)):
         "bio": user.get("bio", ""),
         "avatar": photo_url,
         "status": user.get("status", "active"),
-        "kycStatus": user.get("kyc_status", "NOT_STARTED"),
-        "verified": True
+        "kycStatus": user.get("kyc_status", "APPROVED" if bool(user.get("verified", False) or user.get("is_verified", False) or str(user.get("status", "")).upper() in ("APPROVED", "ACTIVE")) else "NOT_STARTED"),
+        "verified": bool(user.get("verified", False) or user.get("is_verified", False) or str(user.get("status", "")).upper() in ("APPROVED", "ACTIVE")),
+        "isVerified": bool(user.get("verified", False) or user.get("is_verified", False) or str(user.get("status", "")).upper() in ("APPROVED", "ACTIVE")),
+        "is_verified": bool(user.get("verified", False) or user.get("is_verified", False) or str(user.get("status", "")).upper() in ("APPROVED", "ACTIVE"))
     }
 
 @app.get("/api/auth/status")

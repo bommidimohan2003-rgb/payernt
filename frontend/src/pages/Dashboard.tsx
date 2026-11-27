@@ -288,7 +288,12 @@ export default function Dashboard() {
                   <h1 className="text-2xl sm:text-3xl font-black text-neutral-950 dark:text-white tracking-tight">
                     Welcome back, {user?.fullName?.split(" ")[0] || "Creator"}
                   </h1>
-                  {user?.isVerified || (user as any)?.verified || user?.status === "approved" || user?.status === "active" ? (
+                  {Boolean(
+                    user?.isVerified ||
+                    (user as any)?.verified ||
+                    ["approved", "active"].includes(String(user?.status || "").toLowerCase()) ||
+                    ["approved", "verified"].includes(String((user as any)?.kycStatus || (user as any)?.kyc_status || "").toLowerCase())
+                  ) ? (
                     <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                       <ShieldCheck className="w-3.5 h-3.5" />
                       Verified Renter

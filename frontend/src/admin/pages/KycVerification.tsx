@@ -185,7 +185,7 @@ export default function KycVerification() {
           to="/admin/kyc/$id"
           params={{ id: row.id }}
           search={searchState}
-          className="font-mono text-xs font-semibold text-foreground/80 hover:text-primary transition-colors tracking-tight"
+          className="font-mono text-xs font-semibold text-[var(--admin-text-secondary)] hover:text-[var(--admin-success)] transition-colors tracking-tight"
           title="Open application review"
         >
           {row.id.slice(0, 14)}...
@@ -212,16 +212,16 @@ export default function KycVerification() {
                 to="/admin/kyc/$id"
                 params={{ id: row.id }}
                 search={searchState}
-                className="font-semibold text-xs text-foreground hover:text-primary transition-colors truncate max-w-[160px] block"
+                className="font-semibold text-xs text-[var(--admin-text)] hover:text-[var(--admin-success)] transition-colors truncate max-w-40 block"
               >
                 {row.applicant_name || "Applicant"}
               </Link>
               <span
                 className={cn(
-                  "inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md",
+                  "inline-flex items-center gap-1 text-[11px] font-bold px-1.5 py-0.5 rounded-md",
                   isVendor
-                    ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
-                    : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20",
+                    ? "bg-[var(--admin-elevated)] text-[var(--admin-text)] border border-[var(--admin-border)]"
+                    : "bg-[var(--admin-elevated)] text-[var(--admin-text-secondary)] border border-[var(--admin-border)]",
                 )}
               >
                 {isVendor ? (
@@ -241,9 +241,9 @@ export default function KycVerification() {
       label: "Contact Email",
       render: (row) => (
         <div className="text-xs">
-          <span className="text-foreground font-mono">{row.email}</span>
+          <span className="text-[var(--admin-text)] font-mono">{row.email}</span>
           {row.applicant_phone && (
-            <span className="text-[11px] text-muted-foreground block font-mono">
+            <span className="text-[11px] text-[var(--admin-text-muted)] block font-mono">
               {row.applicant_phone}
             </span>
           )}
@@ -257,10 +257,10 @@ export default function KycVerification() {
         const isAadhaar = (row.document_type || "").toUpperCase() === "AADHAAR";
         return (
           <div className="text-xs">
-            <span className="font-bold text-foreground">
+            <span className="font-bold text-[var(--admin-text)]">
               {isAadhaar ? "Aadhaar Card" : "PAN Card"}
             </span>
-            <span className="text-[11px] text-muted-foreground block font-mono">
+            <span className="text-[11px] text-[var(--admin-text-muted)] block font-mono">
               {row.document_number_masked || "••••••••"}
             </span>
           </div>
@@ -274,12 +274,12 @@ export default function KycVerification() {
       render: (row) => {
         const dateStr = row.submitted_at || row.created_at;
         if (!dateStr)
-          return <span className="text-muted-foreground text-xs">—</span>;
+          return <span className="text-[var(--admin-text-muted)] text-xs">—</span>;
         const d = new Date(dateStr);
         return (
           <div className="text-xs">
-            <span className="text-foreground">{d.toLocaleDateString()}</span>
-            <span className="text-[10px] text-muted-foreground block font-mono">
+            <span className="text-[var(--admin-text)]">{d.toLocaleDateString()}</span>
+            <span className="text-[11px] text-[var(--admin-text-muted)] block font-mono">
               {d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
             </span>
           </div>
@@ -292,7 +292,7 @@ export default function KycVerification() {
       sortable: true,
       render: (row) => {
         const st = (row.status || "").toUpperCase();
-        let badgeStyle = "bg-secondary text-muted-foreground border-border";
+        let badgeStyle = "bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] border-[var(--admin-border)]";
         let icon = <Clock className="h-3 w-3" />;
         let label = st;
 
@@ -304,7 +304,7 @@ export default function KycVerification() {
         } else if (st === "PENDING") {
           badgeStyle =
             "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30";
-          icon = <Clock className="h-3 w-3 text-amber-500 animate-pulse" />;
+          icon = <Clock className="h-3 w-3 text-amber-500" />;
           label = "Pending Review";
         } else if (st === "REJECTED") {
           badgeStyle =
@@ -313,15 +313,15 @@ export default function KycVerification() {
           label = "Rejected";
         } else if (st === "NEEDS_INFORMATION" || st === "NEEDS_INFO") {
           badgeStyle =
-            "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20";
-          icon = <HelpCircle className="h-3 w-3 text-indigo-500" />;
+            "bg-amber-500/10 text-[var(--admin-warning)] border-[var(--admin-warning)]/20";
+          icon = <HelpCircle className="h-3 w-3 text-[var(--admin-warning)]" />;
           label = "Needs Info";
         }
 
         return (
           <span
             className={cn(
-              "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border tracking-wide",
+              "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ",
               badgeStyle,
             )}
           >
@@ -336,14 +336,14 @@ export default function KycVerification() {
       label: "Last Reviewed",
       render: (row) => {
         if (!row.reviewed_by)
-          return <span className="text-muted-foreground text-xs">—</span>;
+          return <span className="text-[var(--admin-text-muted)] text-xs">—</span>;
         return (
           <div className="text-xs">
-            <span className="text-foreground truncate max-w-[130px] block font-mono">
+            <span className="text-[var(--admin-text)] truncate max-w-32 block font-mono">
               {row.reviewed_by}
             </span>
             {row.reviewed_at && (
-              <span className="text-[10px] text-muted-foreground block">
+              <span className="text-[11px] text-[var(--admin-text-muted)] block">
                 {new Date(row.reviewed_at).toLocaleDateString()}
               </span>
             )}
@@ -360,7 +360,7 @@ export default function KycVerification() {
           to="/admin/kyc/$id"
           params={{ id: row.id }}
           search={searchState}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground border border-primary/20 transition-all cursor-pointer shadow-xs"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[var(--admin-elevated)] text-[var(--admin-text)] hover:bg-[var(--admin-accent)] hover:text-[var(--admin-bg)] border border-[var(--admin-border)] transition-colors cursor-pointer shadow-xs"
         >
           <Eye className="h-3.5 w-3.5" />
           <span>View Details</span>
@@ -375,15 +375,17 @@ export default function KycVerification() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-semibold text-[var(--admin-text)] tracking-tight">
               KYC Verification
             </h1>
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              <span>Admin Compliance</span>
-            </span>
+            {stats.pending > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium tabular-nums bg-amber-500/10 text-[var(--admin-warning)] border border-[var(--admin-warning)]/20">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--admin-warning)]" />
+                <span>{stats.pending} pending</span>
+              </span>
+            )}
           </div>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+          <p className="text-xs sm:text-sm text-[var(--admin-text-muted)] mt-1">
             Review submitted government identity documents (Aadhaar for Vendors,
             PAN for Renters) and enforce platform safety.
           </p>
@@ -392,12 +394,12 @@ export default function KycVerification() {
         <button
           onClick={() => fetchData(true)}
           disabled={refreshing || loading}
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-card border border-border/80 hover:bg-secondary/80 text-foreground transition-all cursor-pointer shadow-xs shrink-0 disabled:opacity-50"
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-[var(--admin-card)] border border-[var(--admin-border)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] transition-colors cursor-pointer shadow-xs shrink-0 disabled:opacity-50"
         >
           <RefreshCw
             className={cn(
               "h-3.5 w-3.5",
-              refreshing && "animate-spin text-primary",
+              refreshing && "animate-spin text-[var(--admin-success)]",
             )}
           />
           <span>{refreshing ? "Refreshing..." : "Refresh Applications"}</span>
@@ -412,7 +414,7 @@ export default function KycVerification() {
           icon={Layers}
           loading={loading}
           subtext="All-time applications"
-          className="cursor-pointer hover:border-primary/40 transition-colors"
+          className="cursor-pointer hover:border-[var(--admin-text)]/25 transition-colors"
           onClick={() => setStatusFilter("all")}
         />
         <StatsCard
@@ -452,13 +454,13 @@ export default function KycVerification() {
           icon={HelpCircle}
           loading={loading}
           subtext="Awaiting resubmission"
-          className="cursor-pointer hover:border-indigo-500/40 transition-colors col-span-2 lg:col-span-1"
+          className="cursor-pointer hover:border-[var(--admin-text)]/25 transition-colors col-span-2 lg:col-span-1"
           onClick={() => setStatusFilter("NEEDS_INFORMATION")}
         />
       </div>
 
       {/* Filters and Search Bar */}
-      <div className="p-4 rounded-2xl bg-card border border-border/80 shadow-xs space-y-3.5">
+      <div className="p-4 rounded-2xl bg-[var(--admin-card)] border border-[var(--admin-border)] shadow-xs space-y-3.5">
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           {/* Status Filter Tabs */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
@@ -487,21 +489,21 @@ export default function KycVerification() {
                     setCurrentPage(1);
                   }}
                   className={cn(
-                    "px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap inline-flex items-center gap-1.5 cursor-pointer",
+                    "px-3 py-1.5 rounded-xl text-xs font-bold transition-colors whitespace-nowrap inline-flex items-center gap-1.5 cursor-pointer",
                     active
-                      ? "bg-primary text-primary-foreground shadow-xs"
-                      : "bg-secondary/60 hover:bg-secondary text-muted-foreground hover:text-foreground",
+                      ? "bg-primary text-[var(--admin-success)]-foreground shadow-xs"
+                      : "bg-[var(--admin-elevated)]/60 hover:bg-[var(--admin-elevated)] text-[var(--admin-text-muted)] hover:text-[var(--admin-text)]",
                   )}
                 >
                   <span>{tab.label}</span>
                   <span
                     className={cn(
-                      "px-1.5 py-0.5 rounded-full text-[10px] font-mono",
+                      "px-1.5 py-0.5 rounded-full text-[11px] font-mono",
                       active
-                        ? "bg-primary-foreground/20 text-primary-foreground"
+                        ? "bg-primary-foreground/20 text-[var(--admin-success)]-foreground"
                         : tab.highlight && tab.count > 0
                           ? "bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold"
-                          : "bg-muted text-muted-foreground",
+                          : "bg-muted text-[var(--admin-text-muted)]",
                     )}
                   >
                     {tab.count}
@@ -513,7 +515,7 @@ export default function KycVerification() {
 
           {/* Account Type Filter */}
           <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs text-muted-foreground font-semibold flex items-center gap-1">
+            <span className="text-xs text-[var(--admin-text-muted)] font-semibold flex items-center gap-1">
               <Filter className="h-3.5 w-3.5" /> Type:
             </span>
             <select
@@ -522,7 +524,7 @@ export default function KycVerification() {
                 setAccountTypeFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-secondary/80 border border-border/80 text-foreground focus:outline-hidden focus:ring-1 focus:ring-primary cursor-pointer"
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] focus:outline-hidden focus:ring-1 focus:ring-primary cursor-pointer"
             >
               <option value="all">All Accounts (Vendor & Renter)</option>
               <option value="payernt">Vendors only (Aadhaar KYC)</option>
@@ -533,21 +535,21 @@ export default function KycVerification() {
 
         {/* Search input */}
         <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--admin-text-muted)]" />
           <input
             type="text"
-            placeholder="Search by applicant name, email, application ID, or document number..."
+            placeholder="Search by applicant name, email, ID, or document number"
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl text-xs bg-secondary/30 border border-border/70 text-foreground placeholder:text-muted-foreground/60 focus:outline-hidden focus:ring-2 focus:ring-primary/20 transition-all"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl text-xs bg-[var(--admin-elevated)] border border-[var(--admin-border)] text-[var(--admin-text)] placeholder:text-[var(--admin-text-muted)] focus:outline-hidden focus:ring-2 focus:ring-primary/20 transition-colors"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] cursor-pointer"
             >
               <X className="h-3.5 w-3.5" />
             </button>
