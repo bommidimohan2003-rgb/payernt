@@ -123,7 +123,7 @@ The project has a mixed integration state. Some customer-facing features are bac
 
 | Customer route or feature       | Data source                                                                  | Status |
 | ------------------------------- | ---------------------------------------------------------------------------- | ------ |
-| Auth                            | Backend auth routes and JWT flow                                             | Real   |
+| Auth                            | Backend auth routes, JWT flow, and outbound Gmail SMTP email OTP verification for registration & login | Real   |
 | Orders                          | Backend orders and order persistence routes                                  | Real   |
 | Notifications                   | Backend notifications routes                                                 | Real   |
 | Payments                        | Backend payment routes and payment records                                   | Real   |
@@ -139,8 +139,8 @@ The project has a mixed integration state. Some customer-facing features are bac
 | Contact & Support Desk          | Independent Support System: `POST /api/contact` persisted to MySQL `support_tickets` & Admin Support Desk | Real   |
 | **Customer ↔ Lender Messaging** | Dedicated P2P Messaging System: `GET/POST /api/conversations/*`, attachments up to 5MB, live WebSocket sync, unread badge tracking | Real   |
 | **Live Delivery Tracking**      | `GET/POST /api/deliveries/*`, Haversine GPS & WebSocket `/api/deliveries/{id}/ws` | Real   |
-| **Button 1: paye₹nt Vendor**    | Dedicated Vendor Backend: `POST/GET /api/paye₹nt/auth/*`, `/api/paye₹nt/products/*`, 4-digit Vendor Secret PIN (generated ONCE upon listing), `/api/paye₹nt/wallet/*` (balances, bank accounts, withdrawals) | Real |
-| **Button 2: pay₹ent Renter**    | Dedicated Renter Backend: `POST/GET /api/auth/*` (with PAN validation), `/api/products/*`, `/api/bookings/*`, User Dashboard | Real |
+| **Button 1: paye₹nt Vendor**    | Dedicated Vendor Backend: `POST/GET /api/paye₹nt/auth/*` (Email OTP Registration & Login, 6-digit verification), `/api/paye₹nt/products/*`, 4-digit Vendor Secret PIN (generated ONCE upon listing), `/api/paye₹nt/wallet/*` (balances, bank accounts, withdrawals) | Real |
+| **Button 2: pay₹ent Renter**    | Dedicated Renter Backend: `POST/GET /api/auth/*` (Email OTP Registration & Login, PAN validation), `/api/products/*`, `/api/bookings/*`, User Dashboard | Real |
 | **Rental Security & Lifecycle** | Single `RentalSecurity` per booking: `/api/bookings/{id}/security/*` (Vendor PIN + Renter PIN + Handover OTP verification), Backend-authoritative activation (`active`) & completion with wallet credit | Real |
 | **Admin Dashboard & Stats**     | `GET /api/admin/dashboard/stats` with real SQL counts & visitor metrics      | Real   |
 | **Admin Analytics**             | `GET /api/admin/dashboard/charts` with parameterized date-bucketing (`days`) | Real   |
@@ -159,6 +159,17 @@ The project has a mixed integration state. Some customer-facing features are bac
 ## Technical Debt
 
 The main technical debt areas are clear:
+
+- [RESOLVED Outbound Gmail SMTP Mailer, Email OTP Verification & Centered OR Login Flow Across Payrent and Payernt]
+  1. *Outbound Gmail Transactional Mailer*: Integrated production-grade SMTP service via `smtp.gmail.com:587` authenticated with `payentsupport@gmail.com`. Added responsive HTML/plain-text templates in `backend/email_service.py` featuring branded paYent security cards, 6-digit highlighted OTP tokens, and 5-minute expiration warnings.
+  2. *Dual-Portal Email OTP Registration*: Implemented 2-step registration verification across both Payrent (customer, `RegisterForm.tsx`) and Payernt (lender/host, `PayerntAuth.tsx`). Details submission initiates rate-limited OTP generation and email dispatch; account creation is only finalized after valid 6-digit code verification.
+  3. *Clean "OR" Option Login Architecture*: Removed top segmented toggle switches from `/login` and `/payernt`. Introduced standard password sign-in forms followed by a centered `─────── OR ───────` horizontal divider and secondary action button (`[ ✉ Sign in with Email OTP ]`). The OTP views mirror this layout with `─────── OR ─────── [ 🔒 Sign in with Password ]`. Email values seamlessly synchronize across mode switches.
+  4. *Backend Payernt OTP Auth Endpoints*: Added `POST /api/payernt/auth/register/request`, `POST /api/payernt/auth/register` (with OTP verification), `POST /api/payernt/auth/login/otp/request`, and `POST /api/payernt/auth/login/otp/verify` in `backend/payernt_router.py`.
+  5. *Automated Testing & Full Build Verification*: Passed 100% of frontend build tests (`npm run build` in 3.21s), 87/87 frontend unit/integration tests across 23 suites, 9/9 master Payernt backend tests (`backend.tests.test_payernt_master`), and 5/5 dedicated OTP pytest tests (`test_login_otp_flow.py` and `test_payernt_otp_flow.py`).
+
+- [RESOLVED Unslop Agent Skill Installation in Root Workspace]
+  1. *Installation*: Audited workspace and installed Damir Sokolovsky's (`@heydamir`) canonical `unslop` skill into `.agents/skills/unslop/` at the repository root.
+  2. *Capability*: Enables automated detection and systematic removal of generic AI frontend slop (purple glows, glossy blob buttons, emoji tags, broken spacing, clichéd copy) and refactors interfaces to tailored, production-ready designs.
 
 - [RESOLVED Universal Back Button Navigation Audit & Left Top Corner Standardization]
   1. *Safe Internal History Detection*: Enhanced `BackButton.tsx` to safely inspect internal browser history state (`window.history.length > 1 && (window.history.state?.idx > 0 || (Boolean(document.referrer) && document.referrer.includes(window.location.host)))`). When valid within-app history exists, it triggers `window.history.back()`; when navigated to directly or from an external referrer, it falls back to the declared logical route rather than trapping users or looping.
